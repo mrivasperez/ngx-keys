@@ -35,11 +35,14 @@ npm test
 
 ## 🎯 Library Features
 
-- **Reactive Signals**: Track active/inactive shortcuts with Angular signals
-- **Cross-Platform**: Automatic Mac/PC key display formatting  
-- **Dynamic Management**: Add/remove shortcuts at runtime
-- **Group Management**: Organize shortcuts into logical groups
+- **Reactive Signals**: Track active/inactive shortcuts with Angular signals for seamless UI integration
+- **Safe Registration**: Both strict (exception-throwing) and safe (result-returning) registration methods
+- **Cross-Platform**: Automatic Mac/PC key display formatting (`Ctrl+S` vs `⌘+S`)
+- **Dynamic Management**: Add, remove, activate/deactivate shortcuts and groups at runtime
+- **Group Management**: Organize shortcuts into logical groups with bulk operations
+- **Conflict Detection**: Comprehensive validation to prevent duplicate IDs and key combinations
 - **Browser-Safe**: Documentation on avoiding browser conflicts
+- **Fully Tested**: 76 test cases with comprehensive coverage
 
 ## 📖 Documentation
 
@@ -50,10 +53,13 @@ For complete API documentation, examples, and best practices, see:
 
 | Command | Description |
 |---------|-------------|
-| `npm start` | Start demo application |
-| `npm test` | Run unit tests |
-| `ng build ngx-keys` | Build library |
+| `npm start` | Start demo application at http://localhost:4200 |
+| `npm test` | Run unit tests (76 test cases) |
+| `ng test ngx-keys` | Run library tests specifically |
+| `ng build ngx-keys` | Build library for production |
 | `ng build ngx-keys --watch` | Build library in watch mode |
+| `ng build demo` | Build demo application |
+| `ng test ngx-keys --watch=false` | Run tests once without watch mode |
 
 ## 🏗️ Building
 
