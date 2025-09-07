@@ -1,6 +1,29 @@
 {
   "name": "ngx-keys",
   "version": "0.0.1",
+  "description": "A reactive Angular library for managing keyboard shortcuts with signals-based UI integration",
+  "keywords": [
+    "angular",
+    "typescript",
+    "keyboard-shortcuts",
+    "hotkeys",
+    "angular-library",
+    "reactive",
+    "signals",
+    "ui-components",
+    "cross-platform",
+    "angular-signals"
+  ],
+  "license": "MIT",
+  "author": "NgxKeys Contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mrivasperez/ngx-keys.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mrivasperez/ngx-keys/issues"
+  },
+  "homepage": "https://github.com/mrivasperez/ngx-keys#readme",
   "peerDependencies": {
     "@angular/common": "^20.2.0",
     "@angular/core": "^20.2.0"
