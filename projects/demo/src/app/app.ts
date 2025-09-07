@@ -12,7 +12,19 @@ export class App implements OnInit, OnDestroy {
   protected readonly lastAction = signal('Try pressing Ctrl+S, Ctrl+C, or Ctrl+H');
   protected readonly count = signal(0);
 
-  constructor(private keyboardService: KeyboardShortcuts) {}
+  // Reactive signals from the keyboard service - initialized after constructor
+  protected readonly activeShortcuts;
+  protected readonly inactiveShortcuts;
+  protected readonly allShortcuts;
+  protected readonly activeGroups;
+
+  constructor(private keyboardService: KeyboardShortcuts) {
+    // Initialize reactive signals after service injection
+    this.activeShortcuts = this.keyboardService.activeShortcutsUI;
+    this.inactiveShortcuts = this.keyboardService.inactiveShortcutsUI;
+    this.allShortcuts = this.keyboardService.allShortcutsUI;
+    this.activeGroups = this.keyboardService.activeGroupIds;
+  }
 
   ngOnInit() {
     // Register individual shortcuts
