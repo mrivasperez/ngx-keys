@@ -1,59 +1,85 @@
 # NgxKeys
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.2.2.
+A reactive Angular library for managing keyboard shortcuts with signals-based UI integration.
 
-## Development server
+## 📁 Project Structure
 
-To start a local development server, run:
+This is an Angular workspace containing:
 
+- **`projects/ngx-keys/`** - The NgxKeys library source code
+- **`projects/demo/`** - Demo application showcasing library features
+- **Library Documentation** - See [`projects/ngx-keys/README.md`](./projects/ngx-keys/README.md) for complete API documentation
+
+## 🚀 Quick Start
+
+### Install Dependencies
 ```bash
-ng serve
+npm install
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
+### Run Demo Application
 ```bash
-ng generate component component-name
+npm start
+```
+Navigate to `http://localhost:4200/` to see the demo.
+
+### Build Library
+```bash
+ng build ngx-keys
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
+### Run Tests
 ```bash
-ng generate --help
+npm test
 ```
 
-## Building
+## 🎯 Library Features
 
-To build the project run:
+- **Reactive Signals**: Track active/inactive shortcuts with Angular signals
+- **Cross-Platform**: Automatic Mac/PC key display formatting  
+- **Dynamic Management**: Add/remove shortcuts at runtime
+- **Group Management**: Organize shortcuts into logical groups
+- **Browser-Safe**: Documentation on avoiding browser conflicts
 
+## 📖 Documentation
+
+For complete API documentation, examples, and best practices, see:
+**[NgxKeys Library Documentation](./projects/ngx-keys/README.md)**
+
+## 🧪 Development Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start demo application |
+| `npm test` | Run unit tests |
+| `ng build ngx-keys` | Build library |
+| `ng build ngx-keys --watch` | Build library in watch mode |
+
+## 🏗️ Building
+
+### Library
 ```bash
-ng build
+ng build ngx-keys
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
+### Demo Application  
 ```bash
-ng test
+ng build demo
 ```
 
-## Running end-to-end tests
+## 📦 Publishing
 
-For end-to-end (e2e) testing, run:
+1. Build the library:
+   ```bash
+   ng build ngx-keys
+   ```
 
-```bash
-ng e2e
-```
+2. Navigate to dist directory:
+   ```bash
+   cd dist/ngx-keys
+   ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+3. Publish to npm:
+   ```bash
+   npm publish
+   ```

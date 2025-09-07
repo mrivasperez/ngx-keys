@@ -1,63 +1,225 @@
-# MyLib
+# NgxKeys
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.2.0.
+A reactive Angular library for managing keyboard shortcuts with signals-based UI integration.
 
-## Code scaffolding
+## Features
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+- 🎯 **Reactive Signals**: Track active/inactive shortcuts with Angular signals
+- 🎨 **UI Integration**: Ready-to-use computed signals for displaying shortcuts
+- 📱 **Cross-Platform**: Automatic Mac/PC key display formatting
+- 🔄 **Dynamic Management**: Add, remove, activate/deactivate shortcuts at runtime
+- 🎚️ **Group Management**: Organize shortcuts into logical groups
+- 🧪 **Fully Tested**: Comprehensive test coverage with Angular testing utilities
+
+## Installation
 
 ```bash
-ng generate component component-name
+npm install ngx-keys
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Quick Start
 
-```bash
-ng generate --help
+### 1. Import the Service
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
+
+@Component({
+  selector: 'app-example',
+  template: `
+    <h3>Active Shortcuts ({{ activeShortcuts().length }})</h3>
+    <ul>
+      @for (shortcut of activeShortcuts(); track shortcut.id) {
+        <li>
+          <kbd>{{ shortcut.keys }}</kbd> - {{ shortcut.description }}
+        </li>
+      }
+    </ul>
+  `
+})
+export class ExampleComponent implements OnInit {
+  // Reactive signal for UI updates
+  protected readonly activeShortcuts;
+
+  constructor(private keyboardService: KeyboardShortcuts) {
+    this.activeShortcuts = this.keyboardService.activeShortcutsUI;
+  }
+
+  ngOnInit() {
+    // Register shortcuts
+    const shortcuts: KeyboardShortcut[] = [
+      {
+        id: 'save',
+        keys: ['ctrl', 's'],
+        macKeys: ['meta', 's'],
+        action: () => this.save(),
+        description: 'Save document'
+      },
+      {
+        id: 'help',
+        keys: ['f1'],
+        macKeys: ['f1'],
+        action: () => this.showHelp(),
+        description: 'Show help'
+      }
+    ];
+
+    this.keyboardService.registerGroup('main-shortcuts', shortcuts);
+  }
+
+  private save() {
+    console.log('Document saved!');
+  }
+
+  private showHelp() {
+    console.log('Help displayed!');
+  }
+}
+```
+
+### 2. Available Signals
+
+The service provides reactive signals for UI integration:
+
+```typescript
+// All active shortcuts with formatted keys
+activeShortcutsUI: Signal<Array<{id: string, keys: string, macKeys: string, description: string}>>
+
+// All inactive shortcuts
+inactiveShortcutsUI: Signal<Array<{id: string, keys: string, macKeys: string, description: string}>>
+```
+
+## API Reference
+
+### KeyboardShortcuts Service
+
+#### Methods
+
+- `registerGroup(groupId: string, shortcuts: KeyboardShortcut[])` - Register a group of shortcuts
+- `unregisterGroup(groupId: string)` - Remove a group and all its shortcuts
+- `activateGroup(groupId: string)` - Activate all shortcuts in a group
+- `deactivateGroup(groupId: string)` - Deactivate all shortcuts in a group
+- `isGroupActive(groupId: string): boolean` - Check if a group is active
+- `activate(shortcutId: string)` - Activate a single shortcut
+- `deactivate(shortcutId: string)` - Deactivate a single shortcut
+
+#### Properties
+
+- `activeShortcutsUI: Signal<ShortcutUI[]>` - Reactive signal of active shortcuts for UI
+- `inactiveShortcutsUI: Signal<ShortcutUI[]>` - Reactive signal of inactive shortcuts for UI
+
+### KeyboardShortcut Interface
+
+```typescript
+interface KeyboardShortcut {
+  id: string;           // Unique identifier
+  keys: string[];       // Key combination for PC/Linux (e.g., ['ctrl', 's'])
+  macKeys: string[];    // Key combination for Mac (e.g., ['meta', 's'])
+  action: () => void;   // Function to execute
+  description: string;  // Human-readable description
+}
+```
+
+## Key Mapping Reference
+
+### Modifier Keys
+
+| PC/Linux | Mac | Description |
+|----------|-----|-------------|
+| `ctrl` | `meta` | Control/Command key |
+| `alt` | `alt` | Alt/Option key |
+| `shift` | `shift` | Shift key |
+
+### Special Keys
+
+| Key | Value |
+|-----|-------|
+| Function keys | `f1`, `f2`, `f3`, ... `f12` |
+| Arrow keys | `arrowup`, `arrowdown`, `arrowleft`, `arrowright` |
+| Navigation | `home`, `end`, `pageup`, `pagedown` |
+| Editing | `insert`, `delete`, `backspace` |
+| Other | `escape`, `tab`, `enter`, `space` |
+
+## ⚠️ Browser Conflicts Warning
+
+**Important**: Some key combinations conflict with browser defaults. Use these with caution:
+
+### High-Risk Combinations (avoid these)
+- `Ctrl+N` / `⌘+N` - New tab/window
+- `Ctrl+T` / `⌘+T` - New tab
+- `Ctrl+W` / `⌘+W` - Close tab
+- `Ctrl+R` / `⌘+R` - Reload page
+- `Ctrl+L` / `⌘+L` - Focus address bar
+- `Ctrl+D` / `⌘+D` - Bookmark page
+
+### Safer Alternatives
+- Function keys: `F1`, `F2`, `F3`, etc.
+- Custom combinations: `Ctrl+Shift+S`, `Alt+Enter`
+- Arrow keys with modifiers: `Ctrl+ArrowUp`
+- Application-specific: `Ctrl+K`, `Ctrl+P` (if not conflicting)
+
+### Testing Browser Conflicts
+
+Always test your shortcuts across different browsers and operating systems. Consider providing alternative key combinations or allow users to customize shortcuts.
+
+## Advanced Usage
+
+### Route-Specific Shortcuts
+
+```typescript
+export class FeatureComponent implements OnInit, OnDestroy {
+  constructor(private keyboardService: KeyboardShortcuts) {}
+
+  ngOnInit() {
+    // Register shortcuts only for this route
+    this.keyboardService.registerGroup('feature-shortcuts', [
+      {
+        id: 'feature-help',
+        keys: ['f1'],
+        macKeys: ['f1'],
+        action: () => this.showFeatureHelp(),
+        description: 'Show feature help'
+      }
+    ]);
+  }
+
+  ngOnDestroy() {
+    // Clean up when leaving route
+    this.keyboardService.unregisterGroup('feature-shortcuts');
+  }
+}
+```
+
+### Dynamic Shortcut Management
+
+```typescript
+// Toggle shortcuts based on application state
+toggleEditMode() {
+  if (this.isEditMode) {
+    this.keyboardService.activateGroup('edit-shortcuts');
+  } else {
+    this.keyboardService.deactivateGroup('edit-shortcuts');
+  }
+}
 ```
 
 ## Building
 
-To build the library, run:
+To build the library:
 
 ```bash
-ng build my-lib
+ng build ngx-keys
 ```
 
-This command will compile your project, and the build artifacts will be placed in the `dist/` directory.
+## Testing
 
-### Publishing the Library
-
-Once the project is built, you can publish your library by following these steps:
-
-1. Navigate to the `dist` directory:
-   ```bash
-   cd dist/my-lib
-   ```
-
-2. Run the `npm publish` command to publish your library to the npm registry:
-   ```bash
-   npm publish
-   ```
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+To run tests:
 
 ```bash
-ng test
+ng test ngx-keys
 ```
 
-## Running end-to-end tests
+## License
 
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+MIT
