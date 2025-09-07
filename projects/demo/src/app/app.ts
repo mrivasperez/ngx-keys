@@ -1,33 +1,43 @@
-import { Component, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, Injectable, signal } from '@angular/core';
+import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ActionService {
+  private readonly _lastAction = signal('Try pressing global shortcuts: Ctrl+S, Ctrl+C, or Ctrl+H');
+  private readonly _count = signal(0);
+
+  readonly lastAction = this._lastAction.asReadonly();
+  readonly count = this._count.asReadonly();
+
+  setAction(action: string) {
+    this._lastAction.set(action);
+    this._count.update(c => c + 1);
+  }
+
+  incrementCount() {
+    this._count.update(c => c + 1);
+  }
+}
 
 @Component({
   selector: 'app-root',
-  imports: [],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
 export class App implements OnInit, OnDestroy {
-  protected readonly title = signal('NgxKeys Demo');
-  protected readonly lastAction = signal('Try pressing Ctrl+S, Ctrl+C, or Ctrl+H');
-  protected readonly count = signal(0);
+  protected readonly title = 'NgxKeys Demo';
 
-  // Reactive signals from the keyboard service - initialized after constructor
-  protected readonly activeShortcuts;
-  protected readonly inactiveShortcuts;
-  protected readonly allShortcuts;
-  protected readonly activeGroups;
-
-  constructor(private keyboardService: KeyboardShortcuts) {
-    // Initialize reactive signals after service injection
-    this.activeShortcuts = this.keyboardService.activeShortcutsUI;
-    this.inactiveShortcuts = this.keyboardService.inactiveShortcutsUI;
-    this.allShortcuts = this.keyboardService.allShortcutsUI;
-    this.activeGroups = this.keyboardService.activeGroupIds;
-  }
+  constructor(
+    private keyboardService: KeyboardShortcuts,
+    private actionService: ActionService
+  ) {}
 
   ngOnInit() {
-    // Register individual shortcuts
+    // Register global shortcuts that are active on all routes
     this.keyboardService.register({
       id: 'save',
       keys: ['ctrl', 's'],
@@ -44,7 +54,7 @@ export class App implements OnInit, OnDestroy {
       description: 'Show help'
     });
 
-    // Register a group of editing shortcuts
+    // Register a group of global editing shortcuts
     const editingShortcuts: KeyboardShortcut[] = [
       {
         id: 'copy',
@@ -73,71 +83,29 @@ export class App implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    // Clean up shortcuts
+    // Clean up global shortcuts
     this.keyboardService.unregister('save');
     this.keyboardService.unregister('help');
     this.keyboardService.unregisterGroup('editing');
   }
 
   private handleSave() {
-    this.lastAction.set('📄 Document saved!');
-    this.incrementCount();
+    this.actionService.setAction('📄 Global: Document saved!');
   }
 
   private handleCopy() {
-    this.lastAction.set('📋 Content copied!');
-    this.incrementCount();
+    this.actionService.setAction('📋 Global: Content copied!');
   }
 
   private handlePaste() {
-    this.lastAction.set('📝 Content pasted!');
-    this.incrementCount();
+    this.actionService.setAction('📝 Global: Content pasted!');
   }
 
   private handleUndo() {
-    this.lastAction.set('↩️ Action undone!');
-    this.incrementCount();
+    this.actionService.setAction('↩️ Global: Action undone!');
   }
 
   private showHelp() {
-    this.lastAction.set('❓ Help requested!');
-    this.incrementCount();
-  }
-
-  private incrementCount() {
-    this.count.update(c => c + 1);
-  }
-
-  // Methods for button interactions
-  protected toggleEditingGroup() {
-    const isActive = this.keyboardService.isGroupActive('editing');
-    if (isActive) {
-      this.keyboardService.deactivateGroup('editing');
-      this.lastAction.set('🚫 Editing shortcuts disabled');
-    } else {
-      this.keyboardService.activateGroup('editing');
-      this.lastAction.set('✅ Editing shortcuts enabled');
-    }
-    this.incrementCount();
-  }
-
-  protected toggleSaveShortcut() {
-    const isActive = this.keyboardService.isActive('save');
-    if (isActive) {
-      this.keyboardService.deactivate('save');
-      this.lastAction.set('🚫 Save shortcut disabled');
-    } else {
-      this.keyboardService.activate('save');
-      this.lastAction.set('✅ Save shortcut enabled');
-    }
-    this.incrementCount();
-  }
-
-  protected getEditingGroupStatus(): string {
-    return this.keyboardService.isGroupActive('editing') ? '✅ Active' : '❌ Inactive';
-  }
-
-  protected getSaveShortcutStatus(): string {
-    return this.keyboardService.isActive('save') ? '✅ Active' : '❌ Inactive';
+    this.actionService.setAction('❓ Global: Help requested!');
   }
 }

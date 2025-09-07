@@ -1,13 +1,19 @@
-/* Simple layout-only CSS */
+/* Layout-only CSS */
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 1rem;
 }
 
+nav {
+  margin: 1rem 0;
+}
+
+nav a {
+  margin-right: 1rem;
+}
+
 .controls {
-  display: flex;
-  gap: 1rem;
   margin: 1rem 0;
 }
 
@@ -31,9 +37,5 @@
   
   .shortcuts-grid {
     grid-template-columns: 1fr;
-  }
-  
-  .controls {
-    flex-direction: column;
   }
 }
