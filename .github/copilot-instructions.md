@@ -1,47 +1,70 @@
-You are an expert in TypeScript, Angular, and scalable web application development. You write maintainable, performant, and accessible code following Angular and TypeScript best practices.
+You are an expert in TypeScript, Angular, and Angular library development. This is **NgxKeys**, an Angular library project using Angular 20+ with strict TypeScript configuration and modern Angular patterns.
 
-## TypeScript Best Practices
+## Project Architecture
 
-- Use strict type checking
-- Prefer type inference when the type is obvious
-- Avoid the `any` type; use `unknown` when type is uncertain
+This is an **Angular library workspace** using the modern Angular CLI library structure:
+- **Root workspace**: Contains build configuration and workspace-level dependencies
+- **Library project**: Located in `projects/ngx-keys/` with its own `package.json` and build config
+- **Build output**: Libraries are built to `dist/ngx-keys/` using ng-packagr
+- **Public API**: All exports must go through `projects/ngx-keys/src/public-api.ts`
 
-## Angular Best Practices
+## Key Development Workflows
 
-- Always use standalone components over NgModules
-- Must NOT set `standalone: true` inside Angular decorators. It's the default.
-- Use signals for state management
-- Implement lazy loading for feature routes
-- Do NOT use the `@HostBinding` and `@HostListener` decorators. Put host bindings inside the `host` object of the `@Component` or `@Directive` decorator instead
-- Use `NgOptimizedImage` for all static images.
-  - `NgOptimizedImage` does not work for inline base64 images.
+### Building the Library
+```bash
+ng build ngx-keys                 # Build for production (default)
+ng build ngx-keys --configuration development  # Build for development
+```
 
-## Components
+### Testing
+```bash
+ng test                         # Run Karma tests for the library
+ng test ngx-keys                # Explicit library target
+```
 
-- Keep components small and focused on a single responsibility
-- Use `input()` and `output()` functions instead of decorators
-- Use `computed()` for derived state
-- Set `changeDetection: ChangeDetectionStrategy.OnPush` in `@Component` decorator
-- Prefer inline templates for small components
-- Prefer Reactive forms instead of Template-driven ones
-- Do NOT use `ngClass`, use `class` bindings instead
-- Do NOT use `ngStyle`, use `style` bindings instead
+### Library Structure
+- **Entry point**: `projects/ngx-keys/src/public-api.ts` - ALL exports must be declared here
+- **Main library code**: `projects/ngx-keys/src/lib/` - Contains components, services, directives
+- **Component prefix**: `ngx-keys` (configured in `angular.json`)
+- **TypeScript paths**: Use `ngx-keys` import alias that maps to `./dist/ngx-keys`
 
-## State Management
+## TypeScript Configuration
 
-- Use signals for local component state
-- Use `computed()` for derived state
-- Keep state transformations pure and predictable
-- Do NOT use `mutate` on signals, use `update` or `set` instead
+This project uses **strict TypeScript** with enhanced compiler options:
+- `strict: true` with `noImplicitReturns`, `noPropertyAccessFromIndexSignature`
+- `isolatedModules: true` for better tree-shaking
+- **Project references** using `tsconfig.json` references for the library
+- **Path mapping** for library imports in consuming applications
 
-## Templates
+## Angular Library Best Practices
 
-- Keep templates simple and avoid complex logic
-- Use native control flow (`@if`, `@for`, `@switch`) instead of `*ngIf`, `*ngFor`, `*ngSwitch`
-- Use the async pipe to handle observables
+### Components
+- Use standalone components (default in Angular 20+)
+- Follow `ngx-keys` prefix convention for component selectors
+- Use inline templates for simple components (as shown in `ngx-keys.component.ts`)
+- Import statements should use the library's public API when cross-referencing
 
-## Services
+### Library Publishing Pattern
+- Build artifacts go to `dist/ngx-keys/`
+- `package.json` defines peer dependencies (Angular core/common)
+- `sideEffects: false` enables tree-shaking
+- Use ng-packagr for proper Angular library bundling
 
-- Design services around a single responsibility
-- Use the `providedIn: 'root'` option for singleton services
-- Use the `inject()` function instead of constructor injection
+### Development vs Production
+- **Development builds**: Include declaration maps for debugging
+- **Production builds**: Exclude declaration maps, use partial compilation mode
+- **Import paths**: Use `ngx-keys` alias, not relative paths to `dist/`
+
+## Code Formatting
+
+This project uses Prettier with specific Angular configurations:
+- **Print width**: 100 characters
+- **Single quotes** for TypeScript/JavaScript
+- **Angular parser** for HTML templates
+- Follow `.editorconfig` settings (2-space indentation)
+
+## Testing Patterns
+
+- Use **standalone component testing** with `TestBed.configureTestingModule({ imports: [Component] })`
+- Test files follow `.spec.ts` convention
+- Karma configuration optimized for library testing

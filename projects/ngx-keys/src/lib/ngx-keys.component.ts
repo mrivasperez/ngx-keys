@@ -1,15 +1,15 @@
 import { Component } from '@angular/core';
 
 @Component({
-  selector: 'lib-my-lib',
+  selector: 'ngx-keys',
   imports: [],
   template: `
     <p>
-      my-lib works!
+      ngx-keys works!
     </p>
   `,
   styles: ``
 })
-export class MyLib {
+export class NgxKeys {
 
 }

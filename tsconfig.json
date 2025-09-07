@@ -8,8 +8,8 @@
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
     "paths": {
-      "my-lib": [
-        "./dist/my-lib"
+      "ngx-keys": [
+        "./dist/ngx-keys"
       ]
     },
     "noFallthroughCasesInSwitch": true,
@@ -30,10 +30,10 @@
   "files": [],
   "references": [
     {
-      "path": "./projects/my-lib/tsconfig.lib.json"
+      "path": "./projects/ngx-keys/tsconfig.lib.json"
     },
     {
-      "path": "./projects/my-lib/tsconfig.spec.json"
+      "path": "./projects/ngx-keys/tsconfig.spec.json"
     }
   ]
 }

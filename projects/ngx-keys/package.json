@@ -1,5 +1,5 @@
 {
-  "name": "my-lib",
+  "name": "ngx-keys",
   "version": "0.0.1",
   "peerDependencies": {
     "@angular/common": "^20.2.0",

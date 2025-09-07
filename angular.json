@@ -3,20 +3,20 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "my-lib": {
+    "ngx-keys": {
       "projectType": "library",
-      "root": "projects/my-lib",
-      "sourceRoot": "projects/my-lib/src",
-      "prefix": "lib",
+      "root": "projects/ngx-keys",
+      "sourceRoot": "projects/ngx-keys/src",
+      "prefix": "ngx-keys",
       "architect": {
         "build": {
           "builder": "@angular/build:ng-packagr",
           "configurations": {
             "production": {
-              "tsConfig": "projects/my-lib/tsconfig.lib.prod.json"
+              "tsConfig": "projects/ngx-keys/tsconfig.lib.prod.json"
             },
             "development": {
-              "tsConfig": "projects/my-lib/tsconfig.lib.json"
+              "tsConfig": "projects/ngx-keys/tsconfig.lib.json"
             }
           },
           "defaultConfiguration": "production"
@@ -24,7 +24,7 @@
         "test": {
           "builder": "@angular/build:karma",
           "options": {
-            "tsConfig": "projects/my-lib/tsconfig.spec.json"
+            "tsConfig": "projects/ngx-keys/tsconfig.spec.json"
           }
         }
       }
