@@ -96,13 +96,25 @@ inactiveShortcutsUI: Signal<Array<{id: string, keys: string, macKeys: string, de
 
 #### Methods
 
-- `registerGroup(groupId: string, shortcuts: KeyboardShortcut[])` - Register a group of shortcuts
-- `unregisterGroup(groupId: string)` - Remove a group and all its shortcuts
-- `activateGroup(groupId: string)` - Activate all shortcuts in a group
-- `deactivateGroup(groupId: string)` - Deactivate all shortcuts in a group
+**Registration Methods:**
+- `register(shortcut: KeyboardShortcut)` - Register a single shortcut ⚠️ *Throws error if ID already exists*
+- `registerGroup(groupId: string, shortcuts: KeyboardShortcut[])` - Register a group of shortcuts ⚠️ *Throws error on conflicts*
+- `tryRegister(shortcut: KeyboardShortcut): boolean` - Safe registration, returns success status
+- `tryRegisterGroup(groupId: string, shortcuts: KeyboardShortcut[]): {success: boolean, conflicts: object}` - Safe group registration with conflict details
+
+**Management Methods:**
+- `unregister(shortcutId: string)` - Remove a shortcut ⚠️ *Throws error if not found*
+- `unregisterGroup(groupId: string)` - Remove a group ⚠️ *Throws error if not found*
+- `activate(shortcutId: string)` - Activate a shortcut ⚠️ *Throws error if not registered*
+- `deactivate(shortcutId: string)` - Deactivate a shortcut ⚠️ *Throws error if not registered*
+- `activateGroup(groupId: string)` - Activate all shortcuts in a group ⚠️ *Throws error if not found*
+- `deactivateGroup(groupId: string)` - Deactivate all shortcuts in a group ⚠️ *Throws error if not found*
+
+**Query Methods:**
+- `isActive(shortcutId: string): boolean` - Check if a shortcut is active
+- `isRegistered(shortcutId: string): boolean` - Check if a shortcut is registered
 - `isGroupActive(groupId: string): boolean` - Check if a group is active
-- `activate(shortcutId: string)` - Activate a single shortcut
-- `deactivate(shortcutId: string)` - Deactivate a single shortcut
+- `isGroupRegistered(groupId: string): boolean` - Check if a group is registered
 
 #### Properties
 
@@ -164,6 +176,45 @@ interface KeyboardShortcut {
 Always test your shortcuts across different browsers and operating systems. Consider providing alternative key combinations or allow users to customize shortcuts.
 
 ## Advanced Usage
+
+### Error Handling
+
+NgxKeys provides robust error handling to prevent conflicts and invalid operations:
+
+```typescript
+// ⚠️ Methods that throw errors for invalid operations
+try {
+  service.register(duplicateShortcut);
+} catch (error) {
+  console.error(error.message); 
+  // "Keyboard shortcut with ID 'existing-id' is already registered..."
+}
+
+// ✅ Safe methods that return status instead of throwing
+const success = service.tryRegister(shortcut);
+if (!success) {
+  console.log('Shortcut ID already exists');
+}
+
+const result = service.tryRegisterGroup('my-group', shortcuts);
+if (!result.success) {
+  console.log('Conflicts:', result.conflicts);
+  // { groupExists: true, duplicateShortcuts: ['id1', 'id2'] }
+}
+```
+
+### Checking Registration Status
+
+```typescript
+// Before performing operations, check if items exist
+if (service.isRegistered('my-shortcut')) {
+  service.activate('my-shortcut');
+}
+
+if (service.isGroupRegistered('my-group')) {
+  service.activateGroup('my-group');
+}
+```
 
 ### Route-Specific Shortcuts
 
