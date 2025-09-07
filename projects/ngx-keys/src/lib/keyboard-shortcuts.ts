@@ -126,12 +126,33 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   /**
+   * Check if a key combination is already registered
+   * @returns The ID of the conflicting shortcut, or null if no conflict
+   */
+  private findConflict(newShortcut: KeyboardShortcut): string | null {
+    for (const existing of this.shortcuts.values()) {
+      if (this.keysMatch(newShortcut.keys, existing.keys)) {
+        return existing.id;
+      }
+      if (this.keysMatch(newShortcut.macKeys, existing.macKeys)) {
+        return existing.id;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Register a single keyboard shortcut
-   * @throws Error if shortcut ID is already registered
+   * @throws Error if shortcut ID is already registered or key combination is in use
    */
   register(shortcut: KeyboardShortcut): void {
     if (this.shortcuts.has(shortcut.id)) {
       throw new Error(`Keyboard shortcut with ID "${shortcut.id}" is already registered. Use a unique ID or unregister the existing shortcut first.`);
+    }
+
+    const conflictId = this.findConflict(shortcut);
+    if (conflictId) {
+      throw new Error(`Cannot register shortcut "${shortcut.id}": Key combination is already in use by shortcut "${conflictId}".`);
     }
     
     this.shortcuts.set(shortcut.id, shortcut);
@@ -141,7 +162,7 @@ export class KeyboardShortcuts implements OnDestroy {
 
   /**
    * Register multiple keyboard shortcuts as a group
-   * @throws Error if group ID is already registered or if any shortcut ID conflicts
+   * @throws Error if group ID is already registered or if any shortcut ID or key combination conflicts
    */
   registerGroup(groupId: string, shortcuts: KeyboardShortcut[]): void {
     // Check if group ID already exists
@@ -149,16 +170,25 @@ export class KeyboardShortcuts implements OnDestroy {
       throw new Error(`Keyboard shortcut group with ID "${groupId}" is already registered. Use a unique group ID or unregister the existing group first.`);
     }
     
-    // Check for duplicate shortcut IDs
+    // Check for duplicate shortcut IDs and key combination conflicts
     const duplicateIds: string[] = [];
+    const keyConflicts: string[] = [];
     shortcuts.forEach(shortcut => {
       if (this.shortcuts.has(shortcut.id)) {
         duplicateIds.push(shortcut.id);
+      }
+      const conflictId = this.findConflict(shortcut);
+      if (conflictId) {
+        keyConflicts.push(`Shortcut "${shortcut.id}" conflicts with existing shortcut "${conflictId}"`);
       }
     });
     
     if (duplicateIds.length > 0) {
       throw new Error(`Cannot register group "${groupId}": The following shortcut IDs are already registered: ${duplicateIds.join(', ')}. Use unique IDs or unregister the existing shortcuts first.`);
+    }
+
+    if (keyConflicts.length > 0) {
+      throw new Error(`Cannot register group "${groupId}": The following key combinations are already in use: ${keyConflicts.join(', ')}.`);
     }
     
     // Validate that all shortcuts have unique IDs within the group
@@ -196,17 +226,22 @@ export class KeyboardShortcuts implements OnDestroy {
 
   /**
    * Safely register a single keyboard shortcut without throwing errors
-   * @returns true if registration was successful, false if shortcut ID already exists
+   * @returns Object with success status and details about any conflicts
    */
-  tryRegister(shortcut: KeyboardShortcut): boolean {
+  tryRegister(shortcut: KeyboardShortcut): { success: boolean; conflicts: { idExists?: boolean; keyConflict?: string | null } } {
     if (this.shortcuts.has(shortcut.id)) {
-      return false;
+      return { success: false, conflicts: { idExists: true } };
+    }
+
+    const conflictId = this.findConflict(shortcut);
+    if (conflictId) {
+      return { success: false, conflicts: { keyConflict: conflictId } };
     }
     
     this.shortcuts.set(shortcut.id, shortcut);
     this.activeShortcuts.add(shortcut.id);
     this.updateSignals();
-    return true;
+    return { success: true, conflicts: {} };
   }
 
   /**
@@ -215,7 +250,7 @@ export class KeyboardShortcuts implements OnDestroy {
    */
   tryRegisterGroup(groupId: string, shortcuts: KeyboardShortcut[]): { 
     success: boolean; 
-    conflicts: { groupExists?: boolean; duplicateShortcuts?: string[]; duplicatesInGroup?: string[] }
+    conflicts: { groupExists?: boolean; duplicateShortcuts?: string[]; duplicatesInGroup?: string[], keyConflicts?: { shortcutId: string, conflictId: string }[] }
   } {
     const conflicts: any = {};
     
@@ -224,16 +259,24 @@ export class KeyboardShortcuts implements OnDestroy {
       conflicts.groupExists = true;
     }
     
-    // Check for duplicate shortcut IDs
+    // Check for duplicate shortcut IDs and key conflicts
     const duplicateIds: string[] = [];
+    const keyConflicts: { shortcutId: string, conflictId: string }[] = [];
     shortcuts.forEach(shortcut => {
       if (this.shortcuts.has(shortcut.id)) {
         duplicateIds.push(shortcut.id);
+      }
+      const conflictId = this.findConflict(shortcut);
+      if (conflictId) {
+        keyConflicts.push({ shortcutId: shortcut.id, conflictId });
       }
     });
     
     if (duplicateIds.length > 0) {
       conflicts.duplicateShortcuts = duplicateIds;
+    }
+    if (keyConflicts.length > 0) {
+      conflicts.keyConflicts = keyConflicts;
     }
     
     // Check for duplicates within the group
