@@ -1,0 +1,30 @@
+<div class="container">
+  <h1>{{ title() }}</h1>
+  
+  <div class="status">
+    <p>{{ lastAction() }}</p>
+    <small>Actions: {{ count() }}</small>
+  </div>
+
+  <h1>{{ title() }}</h1>
+
+<p><strong>Last Action:</strong> {{ lastAction() }} ({{ count() }} total)</p>
+
+<h2>Keyboard Shortcuts</h2>
+<ul>
+  <li><kbd>Ctrl+S</kbd> - Save {{ getSaveShortcutStatus() }}</li>
+  <li><kbd>Ctrl+H</kbd> - Help</li>
+  <li><kbd>Ctrl+C</kbd> - Copy {{ getEditingGroupStatus() }}</li>
+  <li><kbd>Ctrl+V</kbd> - Paste {{ getEditingGroupStatus() }}</li>
+  <li><kbd>Ctrl+Z</kbd> - Undo {{ getEditingGroupStatus() }}</li>
+</ul>
+
+<h2>Controls</h2>
+<button (click)="toggleSaveShortcut()">Toggle Save Shortcut</button>
+<button (click)="toggleEditingGroup()">Toggle Editing Group</button>
+
+  <div class="controls">
+    <button (click)="toggleSaveShortcut()">Toggle Save</button>
+    <button (click)="toggleEditingGroup()">Toggle Editing Group</button>
+  </div>
+</div>
