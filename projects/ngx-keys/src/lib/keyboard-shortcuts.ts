@@ -1,6 +1,6 @@
-import { Injectable, OnDestroy, PLATFORM_ID, inject } from '@angular/core';
+import { Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { KeyboardShortcut, KeyboardShortcutGroup } from './keyboard-shortcut.interface';
+import { KeyboardShortcut, KeyboardShortcutGroup, KeyboardShortcutUI } from './keyboard-shortcut.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -10,6 +10,64 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly groups = new Map<string, KeyboardShortcutGroup>();
   private readonly activeShortcuts = new Set<string>();
   private readonly activeGroups = new Set<string>();
+  
+  // Reactive signals for UI updates
+  private readonly shortcutsSignal = signal<Map<string, KeyboardShortcut>>(new Map());
+  private readonly groupsSignal = signal<Map<string, KeyboardShortcutGroup>>(new Map());
+  private readonly activeShortcutsSignal = signal<Set<string>>(new Set());
+  private readonly activeGroupsSignal = signal<Set<string>>(new Set());
+  
+  // Computed signals for performant UI access
+  readonly activeShortcutsUI = computed<KeyboardShortcutUI[]>(() => {
+    const shortcuts = this.shortcutsSignal();
+    const activeIds = this.activeShortcutsSignal();
+    
+    return Array.from(activeIds)
+      .map(id => shortcuts.get(id))
+      .filter((shortcut): shortcut is KeyboardShortcut => shortcut !== undefined)
+      .map(shortcut => ({
+        id: shortcut.id,
+        keys: this.formatKeysForDisplay(shortcut.keys, false),
+        macKeys: this.formatKeysForDisplay(shortcut.macKeys, true),
+        description: shortcut.description
+      }));
+  });
+  
+  readonly inactiveShortcutsUI = computed<KeyboardShortcutUI[]>(() => {
+    const shortcuts = this.shortcutsSignal();
+    const activeIds = this.activeShortcutsSignal();
+    
+    return Array.from(shortcuts.values())
+      .filter(shortcut => !activeIds.has(shortcut.id))
+      .map(shortcut => ({
+        id: shortcut.id,
+        keys: this.formatKeysForDisplay(shortcut.keys, false),
+        macKeys: this.formatKeysForDisplay(shortcut.macKeys, true),
+        description: shortcut.description
+      }));
+  });
+  
+  readonly allShortcutsUI = computed<KeyboardShortcutUI[]>(() => {
+    const shortcuts = this.shortcutsSignal();
+    
+    return Array.from(shortcuts.values())
+      .map(shortcut => ({
+        id: shortcut.id,
+        keys: this.formatKeysForDisplay(shortcut.keys, false),
+        macKeys: this.formatKeysForDisplay(shortcut.macKeys, true),
+        description: shortcut.description
+      }));
+  });  readonly activeGroupIds = computed<string[]>(() => {
+    return Array.from(this.activeGroupsSignal());
+  });
+  
+  readonly inactiveGroupIds = computed<string[]>(() => {
+    const groups = this.groupsSignal();
+    const activeIds = this.activeGroupsSignal();
+    
+    return Array.from(groups.keys())
+      .filter(id => !activeIds.has(id));
+  });
   
   private readonly keydownListener = this.handleKeydown.bind(this);
   private isListening = false;
@@ -35,11 +93,45 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   /**
+   * Update all signals to reflect current state
+   */
+  private updateSignals(): void {
+    this.shortcutsSignal.set(new Map(this.shortcuts));
+    this.groupsSignal.set(new Map(this.groups));
+    this.activeShortcutsSignal.set(new Set(this.activeShortcuts));
+    this.activeGroupsSignal.set(new Set(this.activeGroups));
+  }
+
+  /**
+   * Format keys for display with proper Unicode symbols
+   */
+  private formatKeysForDisplay(keys: string[], isMac = false): string {
+    const keyMap: Record<string, string> = isMac ? {
+      'ctrl': '⌃',
+      'alt': '⌥', 
+      'shift': '⇧',
+      'meta': '⌘',
+      'cmd': '⌘',
+      'command': '⌘'
+    } : {
+      'ctrl': 'Ctrl',
+      'alt': 'Alt',
+      'shift': 'Shift', 
+      'meta': 'Win'
+    };
+
+    return keys
+      .map(key => keyMap[key.toLowerCase()] || key.toUpperCase())
+      .join('+');
+  }
+
+  /**
    * Register a single keyboard shortcut
    */
   register(shortcut: KeyboardShortcut): void {
     this.shortcuts.set(shortcut.id, shortcut);
     this.activeShortcuts.add(shortcut.id);
+    this.updateSignals();
   }
 
   /**
@@ -60,6 +152,8 @@ export class KeyboardShortcuts implements OnDestroy {
       this.shortcuts.set(shortcut.id, shortcut);
       this.activeShortcuts.add(shortcut.id);
     });
+    
+    this.updateSignals();
   }
 
   /**
@@ -68,6 +162,7 @@ export class KeyboardShortcuts implements OnDestroy {
   unregister(shortcutId: string): void {
     this.shortcuts.delete(shortcutId);
     this.activeShortcuts.delete(shortcutId);
+    this.updateSignals();
   }
 
   /**
@@ -82,6 +177,7 @@ export class KeyboardShortcuts implements OnDestroy {
       });
       this.groups.delete(groupId);
       this.activeGroups.delete(groupId);
+      this.updateSignals();
     }
   }
 
@@ -91,6 +187,7 @@ export class KeyboardShortcuts implements OnDestroy {
   activate(shortcutId: string): void {
     if (this.shortcuts.has(shortcutId)) {
       this.activeShortcuts.add(shortcutId);
+      this.updateSignals();
     }
   }
 
@@ -99,6 +196,7 @@ export class KeyboardShortcuts implements OnDestroy {
    */
   deactivate(shortcutId: string): void {
     this.activeShortcuts.delete(shortcutId);
+    this.updateSignals();
   }
 
   /**
@@ -112,6 +210,7 @@ export class KeyboardShortcuts implements OnDestroy {
       group.shortcuts.forEach(shortcut => {
         this.activeShortcuts.add(shortcut.id);
       });
+      this.updateSignals();
     }
   }
 
@@ -126,6 +225,7 @@ export class KeyboardShortcuts implements OnDestroy {
       group.shortcuts.forEach(shortcut => {
         this.activeShortcuts.delete(shortcut.id);
       });
+      this.updateSignals();
     }
   }
 
