@@ -1,5 +1,5 @@
 import { Component, signal, OnInit, OnDestroy } from '@angular/core';
-import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
+import { KeyboardShortcuts, KeyboardShortcut, KeyboardShortcutUI } from 'ngx-keys';
 import { ActionService } from '../app';
 
 @Component({
@@ -78,10 +78,10 @@ export class FeatureComponent implements OnInit, OnDestroy {
     private keyboardService: KeyboardShortcuts,
     protected actionService: ActionService
   ) {
-    this.allActiveShortcuts = this.keyboardService.activeShortcutsUI;
+    this.allActiveShortcuts = () => this.keyboardService.shortcutsUI$().active;
     // Filter for feature-specific shortcuts
     this.activeFeatureShortcuts = () => {
-      return this.keyboardService.activeShortcutsUI().filter(shortcut => 
+      return this.keyboardService.shortcutsUI$().active.filter((shortcut: KeyboardShortcutUI) => 
         shortcut.id.startsWith('feature-')
       );
     };

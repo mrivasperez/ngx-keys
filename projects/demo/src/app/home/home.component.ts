@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { KeyboardShortcuts } from 'ngx-keys';
+import { KeyboardShortcuts, KeyboardShortcutUI } from 'ngx-keys';
 import { ActionService } from '../app';
 
 @Component({
@@ -99,10 +99,10 @@ export class HomeComponent implements OnInit {
     protected actionService: ActionService
   ) {
     // Initialize reactive signals after service injection
-    this.activeShortcuts = this.keyboardService.activeShortcutsUI;
-    this.inactiveShortcuts = this.keyboardService.inactiveShortcutsUI;
-    this.allShortcuts = this.keyboardService.allShortcutsUI;
-    this.activeGroups = this.keyboardService.activeGroupIds;
+    this.activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
+    this.inactiveShortcuts = () => this.keyboardService.shortcutsUI$().inactive;
+    this.allShortcuts = () => this.keyboardService.shortcutsUI$().all;
+    this.activeGroups = () => this.keyboardService.shortcuts$().groups.active;
   }
 
   ngOnInit() {
