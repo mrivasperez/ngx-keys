@@ -1,5 +1,6 @@
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { KeyboardShortcut } from './keyboard-shortcut.interface';
+import { KeyboardShortcutsErrors } from './keyboard-shortcuts.errors';
 
 describe('KeyboardShortcuts', () => {
   let service: KeyboardShortcuts;
@@ -45,21 +46,18 @@ describe('KeyboardShortcuts', () => {
 
   describe('Reactive Signals', () => {
     it('should provide reactive signals for UI', () => {
-      expect(service.activeShortcutsUI).toBeDefined();
-      expect(service.inactiveShortcutsUI).toBeDefined();
-      expect(service.allShortcutsUI).toBeDefined();
-      expect(service.activeGroupIds).toBeDefined();
-      expect(service.inactiveGroupIds).toBeDefined();
+      expect(service.shortcuts$).toBeDefined();
+      expect(service.shortcutsUI$).toBeDefined();
     });
 
-    it('should update activeShortcutsUI signal when shortcuts are registered', () => {
-      const initialCount = service.activeShortcutsUI().length;
+    it('should update shortcuts$ signal when shortcuts are registered', () => {
+      const initialCount = service.shortcuts$().active.length;
 
       const shortcut = { ...mockShortcut, action: mockAction };
       service.register(shortcut);
 
-      expect(service.activeShortcutsUI().length).toBe(initialCount + 1);
-      expect(service.activeShortcutsUI()[0]).toEqual({
+      expect(service.shortcuts$().active.length).toBe(initialCount + 1);
+      expect(service.shortcutsUI$().active[0]).toEqual({
         id: 'test-shortcut',
         keys: 'Ctrl+S',
         macKeys: '⌘+S',
@@ -67,40 +65,40 @@ describe('KeyboardShortcuts', () => {
       });
     });
 
-    it('should update inactiveShortcutsUI signal when shortcuts are deactivated', () => {
+    it('should update shortcuts$ signal when shortcuts are deactivated', () => {
       const shortcut = { ...mockShortcut, action: mockAction };
       service.register(shortcut);
       service.deactivate('test-shortcut');
 
-      expect(service.inactiveShortcutsUI().length).toBe(1);
-      expect(service.inactiveShortcutsUI()[0].id).toBe('test-shortcut');
-      expect(service.activeShortcutsUI().length).toBe(0);
+      expect(service.shortcuts$().inactive.length).toBe(1);
+      expect(service.shortcuts$().inactive[0].id).toBe('test-shortcut');
+      expect(service.shortcuts$().active.length).toBe(0);
     });
 
-    it('should update allShortcutsUI signal with all registered shortcuts', () => {
+    it('should update shortcuts$ signal with all registered shortcuts', () => {
       const shortcut1 = { ...mockShortcut, id: 'shortcut-1', action: mockAction };
       const shortcut2 = { ...mockShortcut, id: 'shortcut-2', keys: ['ctrl', 'c'], macKeys: ['meta', 'c'], action: mockAction };
 
       service.register(shortcut1);
       service.register(shortcut2);
 
-      expect(service.allShortcutsUI().length).toBe(2);
-      expect(service.allShortcutsUI().map(s => s.id)).toContain('shortcut-1');
-      expect(service.allShortcutsUI().map(s => s.id)).toContain('shortcut-2');
+      expect(service.shortcuts$().all.length).toBe(2);
+      expect(service.shortcuts$().all.map(s => s.id)).toContain('shortcut-1');
+      expect(service.shortcuts$().all.map(s => s.id)).toContain('shortcut-2');
     });
 
-    it('should update activeGroupIds and inactiveGroupIds signals', () => {
+    it('should update group signals', () => {
       const shortcuts = [
         { ...mockShortcut, id: 'shortcut-1', action: mockAction }
       ];
 
       service.registerGroup('test-group', shortcuts);
-      expect(service.activeGroupIds()).toContain('test-group');
-      expect(service.inactiveGroupIds()).not.toContain('test-group');
+      expect(service.shortcuts$().groups.active).toContain('test-group');
+      expect(service.shortcuts$().groups.inactive).not.toContain('test-group');
 
       service.deactivateGroup('test-group');
-      expect(service.activeGroupIds()).not.toContain('test-group');
-      expect(service.inactiveGroupIds()).toContain('test-group');
+      expect(service.shortcuts$().groups.active).not.toContain('test-group');
+      expect(service.shortcuts$().groups.inactive).toContain('test-group');
     });
   });
 
@@ -134,11 +132,15 @@ describe('KeyboardShortcuts', () => {
     });
 
     it('should throw error when activating non-existent shortcuts', () => {
-      expect(() => service.activate('non-existent')).toThrowError('Cannot activate: Keyboard shortcut with ID "non-existent" is not registered.');
+      expect(() => service.activate('non-existent')).toThrowError(
+        KeyboardShortcutsErrors.CANNOT_ACTIVATE_SHORTCUT('non-existent')
+      );
     });
 
     it('should throw error when deactivating non-existent shortcuts', () => {
-      expect(() => service.deactivate('non-existent')).toThrowError('Cannot deactivate: Keyboard shortcut with ID "non-existent" is not registered.');
+      expect(() => service.deactivate('non-existent')).toThrowError(
+        KeyboardShortcutsErrors.CANNOT_DEACTIVATE_SHORTCUT('non-existent')
+      );
     });
   });
 
@@ -192,15 +194,21 @@ describe('KeyboardShortcuts', () => {
     });
 
     it('should throw error when activating non-existent groups', () => {
-      expect(() => service.activateGroup('non-existent')).toThrowError('Cannot activate: Keyboard shortcut group with ID "non-existent" is not registered.');
+      expect(() => service.activateGroup('non-existent')).toThrowError(
+        KeyboardShortcutsErrors.CANNOT_ACTIVATE_GROUP('non-existent')
+      );
     });
 
     it('should throw error when deactivating non-existent groups', () => {
-      expect(() => service.deactivateGroup('non-existent')).toThrowError('Cannot deactivate: Keyboard shortcut group with ID "non-existent" is not registered.');
+      expect(() => service.deactivateGroup('non-existent')).toThrowError(
+        KeyboardShortcutsErrors.CANNOT_DEACTIVATE_GROUP('non-existent')
+      );
     });
 
     it('should throw error when unregistering non-existent groups', () => {
-      expect(() => service.unregisterGroup('non-existent')).toThrowError('Cannot unregister: Keyboard shortcut group with ID "non-existent" is not registered.');
+      expect(() => service.unregisterGroup('non-existent')).toThrowError(
+        KeyboardShortcutsErrors.CANNOT_UNREGISTER_GROUP('non-existent')
+      );
     });
   });
 
@@ -214,7 +222,7 @@ describe('KeyboardShortcuts', () => {
       };
       service.register(shortcut);
 
-      const formatted = service.allShortcutsUI()[0];
+      const formatted = service.shortcutsUI$().all[0];
       expect(formatted.keys).toBe('Ctrl+Shift+A');
     });
 
@@ -227,7 +235,7 @@ describe('KeyboardShortcuts', () => {
       };
       service.register(shortcut);
 
-      const formatted = service.allShortcutsUI()[0];
+      const formatted = service.shortcutsUI$().all[0];
       expect(formatted.macKeys).toBe('⌘+⌥+⇧+A');
     });
 
@@ -240,7 +248,7 @@ describe('KeyboardShortcuts', () => {
       };
       service.register(shortcut);
 
-      const formatted = service.allShortcutsUI()[0];
+      const formatted = service.shortcutsUI$().all[0];
       expect(formatted.keys).toBe('UNKNOWN+X');
       expect(formatted.macKeys).toBe('UNKNOWN+X');
     });
@@ -264,9 +272,9 @@ describe('KeyboardShortcuts', () => {
       service.register(shortcut1);
       service.register(shortcut2);
 
-      const formatted = service.allShortcutsUI();
-      expect(formatted.find(s => s.id === 'cmd-test')?.macKeys).toBe('⌘+S');
-      expect(formatted.find(s => s.id === 'command-test')?.macKeys).toBe('⌘+C');
+      const formatted = service.shortcutsUI$().all;
+      expect(formatted.find((s: any) => s.id === 'cmd-test')?.macKeys).toBe('⌘+S');
+      expect(formatted.find((s: any) => s.id === 'command-test')?.macKeys).toBe('⌘+C');
     });
   });
 
@@ -497,115 +505,20 @@ describe('KeyboardShortcuts', () => {
 
   describe('Error Handling', () => {
     describe('Duplicate Registration Prevention', () => {
-      describe('Duplicate Registration Prevention', () => {
-        it('should throw error when registering shortcut with duplicate ID', () => {
-          const shortcut: KeyboardShortcut = {
-            id: 'test-shortcut',
-            keys: ['ctrl', 's'],
-            macKeys: ['meta', 's'],
-            action: () => { },
-            description: 'Test shortcut'
-          };
+      it('should throw error when registering shortcut with duplicate ID', () => {
+        const shortcut: KeyboardShortcut = {
+          id: 'test-shortcut',
+          keys: ['ctrl', 's'],
+          macKeys: ['meta', 's'],
+          action: () => { },
+          description: 'Test shortcut'
+        };
 
-          service.register(shortcut);
+        service.register(shortcut);
 
-          expect(() => service.register(shortcut)).toThrowError(
-            'Keyboard shortcut with ID "test-shortcut" is already registered. Use a unique ID or unregister the existing shortcut first.'
-          );
-        });
-
-        it('should throw error when registering shortcut with conflicting key combination', () => {
-          service.register({ ...mockShortcut, id: 'shortcut-1' });
-
-          const conflictingShortcut = {
-            ...mockShortcut,
-            id: 'shortcut-2',
-            keys: ['ctrl', 's'] // Conflict
-          };
-
-          expect(() => service.register(conflictingShortcut)).toThrowError(
-            'Cannot register shortcut "shortcut-2": Key combination is already in use by shortcut "shortcut-1".'
-          );
-        });
-
-        it('should throw error when registering group with duplicate group ID', () => {
-          const shortcuts: KeyboardShortcut[] = [{
-            id: 'shortcut1',
-            keys: ['f1'],
-            macKeys: ['f1'],
-            action: () => { },
-            description: 'Test'
-          }];
-
-          service.registerGroup('test-group', shortcuts);
-
-          expect(() => service.registerGroup('test-group', shortcuts)).toThrowError(
-            'Keyboard shortcut group with ID "test-group" is already registered. Use a unique group ID or unregister the existing group first.'
-          );
-        });
-
-        it('should throw error when registering group with duplicate shortcut IDs', () => {
-          const shortcut: KeyboardShortcut = {
-            id: 'duplicate-shortcut',
-            keys: ['f1'],
-            macKeys: ['f1'],
-            action: () => { },
-            description: 'Test'
-          };
-
-          service.register(shortcut);
-
-          const groupShortcuts: KeyboardShortcut[] = [{
-            id: 'duplicate-shortcut',
-            keys: ['f2'],
-            macKeys: ['f2'],
-            action: () => { },
-            description: 'Duplicate'
-          }];
-
-          expect(() => service.registerGroup('new-group', groupShortcuts)).toThrowError(
-            'Cannot register group "new-group": The following shortcut IDs are already registered: duplicate-shortcut. Use unique IDs or unregister the existing shortcuts first.'
-          );
-        });
-
-        it('should throw error when registering group with duplicate shortcuts within the group', () => {
-          const groupShortcuts: KeyboardShortcut[] = [
-            {
-              id: 'same-id',
-              keys: ['f1'],
-              macKeys: ['f1'],
-              action: () => { },
-              description: 'First'
-            },
-            {
-              id: 'same-id',
-              keys: ['f2'],
-              macKeys: ['f2'],
-              action: () => { },
-              description: 'Second'
-            }
-          ];
-
-          expect(() => service.registerGroup('group-with-duplicates', groupShortcuts)).toThrowError(
-            'Cannot register group "group-with-duplicates": Duplicate shortcut IDs found within the group: same-id. Each shortcut must have a unique ID.'
-          );
-        });
-
-        it('should throw error when registering group with conflicting key combination', () => {
-          service.register({ ...mockShortcut, id: 'existing-shortcut', keys: ['ctrl', 'p'] });
-
-          const groupShortcuts: KeyboardShortcut[] = [{
-            id: 'new-shortcut',
-            keys: ['ctrl', 'p'], // Conflict
-            macKeys: ['meta', 'o'],
-            action: () => { },
-            description: 'New'
-          }];
-
-          expect(() => service.registerGroup('conflict-group', groupShortcuts)).toThrowError(
-            'Cannot register group "conflict-group": The following key combinations are already in use: Shortcut "new-shortcut" conflicts with existing shortcut "existing-shortcut".'
-          );
-        });
+        expect(() => service.register(shortcut)).toThrowError(
+          KeyboardShortcutsErrors.SHORTCUT_ALREADY_REGISTERED('test-shortcut')
+        );
       });
 
       it('should throw error when registering shortcut with conflicting key combination', () => {
@@ -618,7 +531,7 @@ describe('KeyboardShortcuts', () => {
         };
 
         expect(() => service.register(conflictingShortcut)).toThrowError(
-          'Cannot register shortcut "shortcut-2": Key combination is already in use by shortcut "shortcut-1".'
+          KeyboardShortcutsErrors.KEY_CONFLICT('shortcut-1')
         );
       });
 
@@ -634,7 +547,7 @@ describe('KeyboardShortcuts', () => {
         service.registerGroup('test-group', shortcuts);
 
         expect(() => service.registerGroup('test-group', shortcuts)).toThrowError(
-          'Keyboard shortcut group with ID "test-group" is already registered. Use a unique group ID or unregister the existing group first.'
+          KeyboardShortcutsErrors.GROUP_ALREADY_REGISTERED('test-group')
         );
       });
 
@@ -658,7 +571,7 @@ describe('KeyboardShortcuts', () => {
         }];
 
         expect(() => service.registerGroup('new-group', groupShortcuts)).toThrowError(
-          'Cannot register group "new-group": The following shortcut IDs are already registered: duplicate-shortcut. Use unique IDs or unregister the existing shortcuts first.'
+          KeyboardShortcutsErrors.SHORTCUT_IDS_ALREADY_REGISTERED(['duplicate-shortcut'])
         );
       });
 
@@ -681,7 +594,7 @@ describe('KeyboardShortcuts', () => {
         ];
 
         expect(() => service.registerGroup('group-with-duplicates', groupShortcuts)).toThrowError(
-          'Cannot register group "group-with-duplicates": Duplicate shortcut IDs found within the group: same-id. Each shortcut must have a unique ID.'
+          KeyboardShortcutsErrors.DUPLICATE_SHORTCUTS_IN_GROUP(['same-id'])
         );
       });
 
@@ -697,7 +610,7 @@ describe('KeyboardShortcuts', () => {
         }];
 
         expect(() => service.registerGroup('conflict-group', groupShortcuts)).toThrowError(
-          'Cannot register group "conflict-group": The following key combinations are already in use: Shortcut "new-shortcut" conflicts with existing shortcut "existing-shortcut".'
+          KeyboardShortcutsErrors.KEY_CONFLICTS_IN_GROUP(['"new-shortcut" conflicts with "existing-shortcut"'])
         );
       });
     });
@@ -705,169 +618,38 @@ describe('KeyboardShortcuts', () => {
     describe('Operation on Non-Existent Items', () => {
       it('should throw error when unregistering non-existent shortcut', () => {
         expect(() => service.unregister('non-existent')).toThrowError(
-          'Cannot unregister: Keyboard shortcut with ID "non-existent" is not registered.'
+          KeyboardShortcutsErrors.CANNOT_UNREGISTER_SHORTCUT('non-existent')
         );
       });
 
       it('should throw error when unregistering non-existent group', () => {
         expect(() => service.unregisterGroup('non-existent')).toThrowError(
-          'Cannot unregister: Keyboard shortcut group with ID "non-existent" is not registered.'
+          KeyboardShortcutsErrors.CANNOT_UNREGISTER_GROUP('non-existent')
         );
       });
 
       it('should throw error when activating non-existent shortcut', () => {
         expect(() => service.activate('non-existent')).toThrowError(
-          'Cannot activate: Keyboard shortcut with ID "non-existent" is not registered.'
+          KeyboardShortcutsErrors.CANNOT_ACTIVATE_SHORTCUT('non-existent')
         );
       });
 
       it('should throw error when deactivating non-existent shortcut', () => {
         expect(() => service.deactivate('non-existent')).toThrowError(
-          'Cannot deactivate: Keyboard shortcut with ID "non-existent" is not registered.'
+          KeyboardShortcutsErrors.CANNOT_DEACTIVATE_SHORTCUT('non-existent')
         );
       });
 
       it('should throw error when activating non-existent group', () => {
         expect(() => service.activateGroup('non-existent')).toThrowError(
-          'Cannot activate: Keyboard shortcut group with ID "non-existent" is not registered.'
+          KeyboardShortcutsErrors.CANNOT_ACTIVATE_GROUP('non-existent')
         );
       });
 
       it('should throw error when deactivating non-existent group', () => {
         expect(() => service.deactivateGroup('non-existent')).toThrowError(
-          'Cannot deactivate: Keyboard shortcut group with ID "non-existent" is not registered.'
+          KeyboardShortcutsErrors.CANNOT_DEACTIVATE_GROUP('non-existent')
         );
-      });
-    });
-
-    describe('Safe Registration Methods', () => {
-      it('should safely register shortcut without throwing', () => {
-        const shortcut: KeyboardShortcut = {
-          id: 'safe-shortcut',
-          keys: ['f1'],
-          macKeys: ['f1'],
-          action: () => { },
-          description: 'Safe test'
-        };
-
-        const result = service.tryRegister(shortcut);
-        expect(result.success).toBe(true);
-        expect(result.conflicts).toEqual({});
-        expect(service.isRegistered('safe-shortcut')).toBe(true);
-      });
-
-      it('should return false when trying to register duplicate shortcut', () => {
-        const shortcut: KeyboardShortcut = {
-          id: 'existing-shortcut',
-          keys: ['f1'],
-          macKeys: ['f1'],
-          action: () => { },
-          description: 'Test'
-        };
-
-        // First register the shortcut
-        service.register(shortcut);
-
-        // Now try to register it again
-        const result = service.tryRegister(shortcut);
-
-        expect(result.success).toBe(false);
-        expect(result.conflicts.idExists).toBe(true);
-      });
-
-      it('should return keyConflict when trying to register shortcut with conflicting keys', () => {
-        service.register({ ...mockShortcut, id: 'shortcut-1', keys: ['ctrl', 'k'] });
-
-        const conflictingShortcut: KeyboardShortcut = {
-          id: 'shortcut-2',
-          keys: ['ctrl', 'k'],
-          macKeys: ['meta', 'j'],
-          action: () => { },
-          description: 'Conflicting'
-        };
-
-        const result = service.tryRegister(conflictingShortcut);
-
-        expect(result.success).toBe(false);
-        expect(result.conflicts.keyConflict).toBe('shortcut-1');
-      });
-
-      it('should safely register group without throwing', () => {
-        const shortcuts: KeyboardShortcut[] = [{
-          id: 'group-shortcut',
-          keys: ['f1'],
-          macKeys: ['f1'],
-          action: () => { },
-          description: 'Test'
-        }];
-
-        const result = service.tryRegisterGroup('safe-group', shortcuts);
-
-        expect(result.success).toBe(true);
-        expect(result.conflicts).toEqual({});
-        expect(service.isGroupRegistered('safe-group')).toBe(true);
-      });
-
-      it('should return conflicts when trying to register duplicate group', () => {
-        const shortcuts: KeyboardShortcut[] = [{
-          id: 'shortcut1',
-          keys: ['f1'],
-          macKeys: ['f1'],
-          action: () => { },
-          description: 'Test'
-        }];
-
-        service.registerGroup('existing-group', shortcuts);
-
-        const result = service.tryRegisterGroup('existing-group', shortcuts);
-
-        expect(result.success).toBe(false);
-        expect(result.conflicts.groupExists).toBe(true);
-      });
-
-      it('should return conflicts when trying to register group with duplicate shortcuts', () => {
-        const existingShortcut: KeyboardShortcut = {
-          id: 'existing-shortcut',
-          keys: ['f1'],
-          macKeys: ['f1'],
-          action: () => { },
-          description: 'Existing'
-        };
-
-        service.register(existingShortcut);
-
-        const groupShortcuts: KeyboardShortcut[] = [
-          existingShortcut,
-          {
-            id: 'new-shortcut',
-            keys: ['f2'],
-            macKeys: ['f2'],
-            action: () => { },
-            description: 'New'
-          }
-        ];
-
-        const result = service.tryRegisterGroup('conflict-group', groupShortcuts);
-
-        expect(result.success).toBe(false);
-        expect(result.conflicts.duplicateShortcuts).toEqual(['existing-shortcut']);
-      });
-
-      it('should return key conflicts when trying to register group with conflicting keys', () => {
-        service.register({ ...mockShortcut, id: 'existing-shortcut', keys: ['ctrl', 'p'] });
-
-        const groupShortcuts: KeyboardShortcut[] = [{
-          id: 'new-shortcut',
-          keys: ['ctrl', 'p'], // Conflict
-          macKeys: ['meta', 'o'],
-          action: () => { },
-          description: 'New'
-        }];
-
-        const result = service.tryRegisterGroup('conflict-group', groupShortcuts);
-
-        expect(result.success).toBe(false);
-        expect(result.conflicts.keyConflicts).toEqual([{ shortcutId: 'new-shortcut', conflictId: 'existing-shortcut' }]);
       });
     });
 

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 
@@ -9,7 +9,7 @@ import { KeyboardShortcuts } from './keyboard-shortcuts';
     <div class="keyboard-shortcuts">
       <h3>Active Keyboard Shortcuts</h3>
       <div class="shortcuts-grid">
-        @for (shortcut of keyboardShortcuts.activeShortcutsUI(); track shortcut.keys) {
+        @for (shortcut of activeShortcutsFormatted(); track shortcut.id) {
           <div class="shortcut-item">
             <span class="keys">{{ shortcut.keys }}</span>
             <span class="mac-keys" *ngIf="shortcut.macKeys !== shortcut.keys">{{ shortcut.macKeys }}</span>
@@ -18,16 +18,16 @@ import { KeyboardShortcuts } from './keyboard-shortcuts';
         }
       </div>
 
-      <h3>Active Groups</h3>
+      <h3>Active Groups ({{ activeGroupCount() }})</h3>
       <div class="groups-list">
-        @for (group of keyboardShortcuts.activeGroupIds(); track group) {
+        @for (group of shortcuts().groups.active; track group) {
           <span class="group-badge">{{ group }}</span>
         }
       </div>
 
-      <h3>Inactive Groups</h3>
+      <h3>Inactive Groups ({{ inactiveGroupCount() }})</h3>
       <div class="groups-list">
-        @for (group of keyboardShortcuts.inactiveGroupIds(); track group) {
+        @for (group of shortcuts().groups.inactive; track group) {
           <span class="group-badge inactive">{{ group }}</span>
         }
       </div>
@@ -102,5 +102,21 @@ import { KeyboardShortcuts } from './keyboard-shortcuts';
   `
 })
 export class NgxKeys {
-  protected readonly keyboardShortcuts = inject(KeyboardShortcuts);
+  private readonly keyboardShortcuts = inject(KeyboardShortcuts);
+  
+  // Component derives exactly what it needs - no wasted computations
+  protected readonly shortcuts = this.keyboardShortcuts.shortcuts$;
+  
+  // Lightweight computed signals for specific UI needs
+  protected readonly activeShortcutsFormatted = computed(() => 
+    this.shortcuts().active.map(s => this.keyboardShortcuts.formatShortcutForUI(s))
+  );
+  
+  protected readonly activeGroupCount = computed(() => 
+    this.shortcuts().groups.active.length
+  );
+  
+  protected readonly inactiveGroupCount = computed(() => 
+    this.shortcuts().groups.inactive.length
+  );
 }

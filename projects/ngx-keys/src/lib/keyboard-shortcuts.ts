@@ -1,6 +1,7 @@
 import { Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { KeyboardShortcut, KeyboardShortcutGroup, KeyboardShortcutUI } from './keyboard-shortcut.interface';
+import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
 
 @Injectable({
   providedIn: 'root'
@@ -11,62 +12,45 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly activeShortcuts = new Set<string>();
   private readonly activeGroups = new Set<string>();
   
-  // Reactive signals for UI updates
-  private readonly shortcutsSignal = signal<Map<string, KeyboardShortcut>>(new Map());
-  private readonly groupsSignal = signal<Map<string, KeyboardShortcutGroup>>(new Map());
-  private readonly activeShortcutsSignal = signal<Set<string>>(new Set());
-  private readonly activeGroupsSignal = signal<Set<string>>(new Set());
-  
-  // Computed signals for performant UI access
-  readonly activeShortcutsUI = computed<KeyboardShortcutUI[]>(() => {
-    const shortcuts = this.shortcutsSignal();
-    const activeIds = this.activeShortcutsSignal();
-    
-    return Array.from(activeIds)
-      .map(id => shortcuts.get(id))
-      .filter((shortcut): shortcut is KeyboardShortcut => shortcut !== undefined)
-      .map(shortcut => ({
-        id: shortcut.id,
-        keys: this.formatKeysForDisplay(shortcut.keys, false),
-        macKeys: this.formatKeysForDisplay(shortcut.macKeys, true),
-        description: shortcut.description
-      }));
+  // Single consolidated state signal - reduces memory overhead
+  private readonly state = signal({
+    shortcuts: new Map<string, KeyboardShortcut>(),
+    groups: new Map<string, KeyboardShortcutGroup>(),
+    activeShortcuts: new Set<string>(),
+    activeGroups: new Set<string>(),
+    version: 0 // for change detection optimization
   });
   
-  readonly inactiveShortcutsUI = computed<KeyboardShortcutUI[]>(() => {
-    const shortcuts = this.shortcutsSignal();
-    const activeIds = this.activeShortcutsSignal();
-    
-    return Array.from(shortcuts.values())
-      .filter(shortcut => !activeIds.has(shortcut.id))
-      .map(shortcut => ({
-        id: shortcut.id,
-        keys: this.formatKeysForDisplay(shortcut.keys, false),
-        macKeys: this.formatKeysForDisplay(shortcut.macKeys, true),
-        description: shortcut.description
-      }));
+  // Primary computed signal - consumers derive what they need from this
+  readonly shortcuts$ = computed(() => {
+    const state = this.state();
+    const activeShortcuts = Array.from(state.activeShortcuts)
+      .map(id => state.shortcuts.get(id))
+      .filter((s): s is KeyboardShortcut => s !== undefined);
+      
+    const inactiveShortcuts = Array.from(state.shortcuts.values())
+      .filter(s => !state.activeShortcuts.has(s.id));
+      
+    return {
+      active: activeShortcuts,
+      inactive: inactiveShortcuts,
+      all: Array.from(state.shortcuts.values()),
+      groups: {
+        active: Array.from(state.activeGroups),
+        inactive: Array.from(state.groups.keys())
+          .filter(id => !state.activeGroups.has(id))
+      }
+    };
   });
-  
-  readonly allShortcutsUI = computed<KeyboardShortcutUI[]>(() => {
-    const shortcuts = this.shortcutsSignal();
-    
-    return Array.from(shortcuts.values())
-      .map(shortcut => ({
-        id: shortcut.id,
-        keys: this.formatKeysForDisplay(shortcut.keys, false),
-        macKeys: this.formatKeysForDisplay(shortcut.macKeys, true),
-        description: shortcut.description
-      }));
-  });  readonly activeGroupIds = computed<string[]>(() => {
-    return Array.from(this.activeGroupsSignal());
-  });
-  
-  readonly inactiveGroupIds = computed<string[]>(() => {
-    const groups = this.groupsSignal();
-    const activeIds = this.activeGroupsSignal();
-    
-    return Array.from(groups.keys())
-      .filter(id => !activeIds.has(id));
+
+  // Optional: Pre-formatted UI signal for components that need it
+  readonly shortcutsUI$ = computed(() => {
+    const shortcuts = this.shortcuts$();
+    return {
+      active: shortcuts.active.map(s => this.formatShortcutForUI(s)),
+      inactive: shortcuts.inactive.map(s => this.formatShortcutForUI(s)),
+      all: shortcuts.all.map(s => this.formatShortcutForUI(s))
+    };
   });
   
   private readonly keydownListener = this.handleKeydown.bind(this);
@@ -93,13 +77,36 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   /**
-   * Update all signals to reflect current state
+   * Batch updates and increment version for change detection
    */
-  private updateSignals(): void {
-    this.shortcutsSignal.set(new Map(this.shortcuts));
-    this.groupsSignal.set(new Map(this.groups));
-    this.activeShortcutsSignal.set(new Set(this.activeShortcuts));
-    this.activeGroupsSignal.set(new Set(this.activeGroups));
+  private updateState(): void {
+    this.state.update(current => ({
+      shortcuts: new Map(this.shortcuts),
+      groups: new Map(this.groups),
+      activeShortcuts: new Set(this.activeShortcuts),
+      activeGroups: new Set(this.activeGroups),
+      version: current.version + 1
+    }));
+  }
+
+  /**
+   * Utility method for UI formatting
+   */
+  formatShortcutForUI(shortcut: KeyboardShortcut): KeyboardShortcutUI {
+    return {
+      id: shortcut.id,
+      keys: this.formatKeysForDisplay(shortcut.keys, false),
+      macKeys: this.formatKeysForDisplay(shortcut.macKeys, true),
+      description: shortcut.description
+    };
+  }
+
+  /**
+   * Utility method for batch operations - reduces signal updates
+   */
+  batchUpdate(operations: () => void): void {
+    operations();
+    this.updateState();
   }
 
   /**
@@ -143,31 +150,31 @@ export class KeyboardShortcuts implements OnDestroy {
 
   /**
    * Register a single keyboard shortcut
-   * @throws Error if shortcut ID is already registered or key combination is in use
+   * @throws KeyboardShortcutError if shortcut ID is already registered or key combination is in use
    */
   register(shortcut: KeyboardShortcut): void {
     if (this.shortcuts.has(shortcut.id)) {
-      throw new Error(`Keyboard shortcut with ID "${shortcut.id}" is already registered. Use a unique ID or unregister the existing shortcut first.`);
+      throw KeyboardShortcutsErrorFactory.shortcutAlreadyRegistered(shortcut.id);
     }
 
     const conflictId = this.findConflict(shortcut);
     if (conflictId) {
-      throw new Error(`Cannot register shortcut "${shortcut.id}": Key combination is already in use by shortcut "${conflictId}".`);
+      throw KeyboardShortcutsErrorFactory.keyConflict(conflictId);
     }
     
     this.shortcuts.set(shortcut.id, shortcut);
     this.activeShortcuts.add(shortcut.id);
-    this.updateSignals();
+    this.updateState();
   }
 
   /**
    * Register multiple keyboard shortcuts as a group
-   * @throws Error if group ID is already registered or if any shortcut ID or key combination conflicts
+   * @throws KeyboardShortcutError if group ID is already registered or if any shortcut ID or key combination conflicts
    */
   registerGroup(groupId: string, shortcuts: KeyboardShortcut[]): void {
     // Check if group ID already exists
     if (this.groups.has(groupId)) {
-      throw new Error(`Keyboard shortcut group with ID "${groupId}" is already registered. Use a unique group ID or unregister the existing group first.`);
+      throw KeyboardShortcutsErrorFactory.groupAlreadyRegistered(groupId);
     }
     
     // Check for duplicate shortcut IDs and key combination conflicts
@@ -179,16 +186,16 @@ export class KeyboardShortcuts implements OnDestroy {
       }
       const conflictId = this.findConflict(shortcut);
       if (conflictId) {
-        keyConflicts.push(`Shortcut "${shortcut.id}" conflicts with existing shortcut "${conflictId}"`);
+        keyConflicts.push(`"${shortcut.id}" conflicts with "${conflictId}"`);
       }
     });
     
     if (duplicateIds.length > 0) {
-      throw new Error(`Cannot register group "${groupId}": The following shortcut IDs are already registered: ${duplicateIds.join(', ')}. Use unique IDs or unregister the existing shortcuts first.`);
+      throw KeyboardShortcutsErrorFactory.shortcutIdsAlreadyRegistered(duplicateIds);
     }
 
     if (keyConflicts.length > 0) {
-      throw new Error(`Cannot register group "${groupId}": The following key combinations are already in use: ${keyConflicts.join(', ')}.`);
+      throw KeyboardShortcutsErrorFactory.keyConflictsInGroup(keyConflicts);
     }
     
     // Validate that all shortcuts have unique IDs within the group
@@ -203,215 +210,124 @@ export class KeyboardShortcuts implements OnDestroy {
     });
     
     if (duplicatesInGroup.length > 0) {
-      throw new Error(`Cannot register group "${groupId}": Duplicate shortcut IDs found within the group: ${duplicatesInGroup.join(', ')}. Each shortcut must have a unique ID.`);
+      throw KeyboardShortcutsErrorFactory.duplicateShortcutsInGroup(duplicatesInGroup);
     }
     
-    const group: KeyboardShortcutGroup = {
-      id: groupId,
-      shortcuts,
-      active: true
-    };
-    
-    this.groups.set(groupId, group);
-    this.activeGroups.add(groupId);
-    
-    // Register individual shortcuts
-    shortcuts.forEach(shortcut => {
-      this.shortcuts.set(shortcut.id, shortcut);
-      this.activeShortcuts.add(shortcut.id);
+    // Use batch update to reduce signal updates
+    this.batchUpdate(() => {
+      const group: KeyboardShortcutGroup = {
+        id: groupId,
+        shortcuts,
+        active: true
+      };
+      
+      this.groups.set(groupId, group);
+      this.activeGroups.add(groupId);
+      
+      // Register individual shortcuts
+      shortcuts.forEach(shortcut => {
+        this.shortcuts.set(shortcut.id, shortcut);
+        this.activeShortcuts.add(shortcut.id);
+      });
     });
-    
-    this.updateSignals();
-  }
-
-  /**
-   * Safely register a single keyboard shortcut without throwing errors
-   * @returns Object with success status and details about any conflicts
-   */
-  tryRegister(shortcut: KeyboardShortcut): { success: boolean; conflicts: { idExists?: boolean; keyConflict?: string | null } } {
-    if (this.shortcuts.has(shortcut.id)) {
-      return { success: false, conflicts: { idExists: true } };
-    }
-
-    const conflictId = this.findConflict(shortcut);
-    if (conflictId) {
-      return { success: false, conflicts: { keyConflict: conflictId } };
-    }
-    
-    this.shortcuts.set(shortcut.id, shortcut);
-    this.activeShortcuts.add(shortcut.id);
-    this.updateSignals();
-    return { success: true, conflicts: {} };
-  }
-
-  /**
-   * Safely register multiple keyboard shortcuts as a group without throwing errors
-   * @returns Object with success status and details about any conflicts
-   */
-  tryRegisterGroup(groupId: string, shortcuts: KeyboardShortcut[]): { 
-    success: boolean; 
-    conflicts: { groupExists?: boolean; duplicateShortcuts?: string[]; duplicatesInGroup?: string[], keyConflicts?: { shortcutId: string, conflictId: string }[] }
-  } {
-    const conflicts: any = {};
-    
-    // Check if group ID already exists
-    if (this.groups.has(groupId)) {
-      conflicts.groupExists = true;
-    }
-    
-    // Check for duplicate shortcut IDs and key conflicts
-    const duplicateIds: string[] = [];
-    const keyConflicts: { shortcutId: string, conflictId: string }[] = [];
-    shortcuts.forEach(shortcut => {
-      if (this.shortcuts.has(shortcut.id)) {
-        duplicateIds.push(shortcut.id);
-      }
-      const conflictId = this.findConflict(shortcut);
-      if (conflictId) {
-        keyConflicts.push({ shortcutId: shortcut.id, conflictId });
-      }
-    });
-    
-    if (duplicateIds.length > 0) {
-      conflicts.duplicateShortcuts = duplicateIds;
-    }
-    if (keyConflicts.length > 0) {
-      conflicts.keyConflicts = keyConflicts;
-    }
-    
-    // Check for duplicates within the group
-    const groupIds = new Set<string>();
-    const duplicatesInGroup: string[] = [];
-    shortcuts.forEach(shortcut => {
-      if (groupIds.has(shortcut.id)) {
-        duplicatesInGroup.push(shortcut.id);
-      } else {
-        groupIds.add(shortcut.id);
-      }
-    });
-    
-    if (duplicatesInGroup.length > 0) {
-      conflicts.duplicatesInGroup = duplicatesInGroup;
-    }
-    
-    // If any conflicts, return false
-    if (Object.keys(conflicts).length > 0) {
-      return { success: false, conflicts };
-    }
-    
-    // Register the group
-    const group: KeyboardShortcutGroup = {
-      id: groupId,
-      shortcuts,
-      active: true
-    };
-    
-    this.groups.set(groupId, group);
-    this.activeGroups.add(groupId);
-    
-    // Register individual shortcuts
-    shortcuts.forEach(shortcut => {
-      this.shortcuts.set(shortcut.id, shortcut);
-      this.activeShortcuts.add(shortcut.id);
-    });
-    
-    this.updateSignals();
-    return { success: true, conflicts: {} };
   }
 
   /**
    * Unregister a single keyboard shortcut
-   * @throws Error if shortcut ID doesn't exist
+   * @throws KeyboardShortcutError if shortcut ID doesn't exist
    */
   unregister(shortcutId: string): void {
     if (!this.shortcuts.has(shortcutId)) {
-      throw new Error(`Cannot unregister: Keyboard shortcut with ID "${shortcutId}" is not registered.`);
+      throw KeyboardShortcutsErrorFactory.cannotUnregisterShortcut(shortcutId);
     }
     
     this.shortcuts.delete(shortcutId);
     this.activeShortcuts.delete(shortcutId);
-    this.updateSignals();
+    this.updateState();
   }
 
   /**
    * Unregister a group of keyboard shortcuts
-   * @throws Error if group ID doesn't exist
+   * @throws KeyboardShortcutError if group ID doesn't exist
    */
   unregisterGroup(groupId: string): void {
     const group = this.groups.get(groupId);
     if (!group) {
-      throw new Error(`Cannot unregister: Keyboard shortcut group with ID "${groupId}" is not registered.`);
+      throw KeyboardShortcutsErrorFactory.cannotUnregisterGroup(groupId);
     }
     
-    group.shortcuts.forEach(shortcut => {
-      this.shortcuts.delete(shortcut.id);
-      this.activeShortcuts.delete(shortcut.id);
+    this.batchUpdate(() => {
+      group.shortcuts.forEach(shortcut => {
+        this.shortcuts.delete(shortcut.id);
+        this.activeShortcuts.delete(shortcut.id);
+      });
+      this.groups.delete(groupId);
+      this.activeGroups.delete(groupId);
     });
-    this.groups.delete(groupId);
-    this.activeGroups.delete(groupId);
-    this.updateSignals();
   }
 
   /**
    * Activate a single keyboard shortcut
-   * @throws Error if shortcut ID doesn't exist
+   * @throws KeyboardShortcutError if shortcut ID doesn't exist
    */
   activate(shortcutId: string): void {
     if (!this.shortcuts.has(shortcutId)) {
-      throw new Error(`Cannot activate: Keyboard shortcut with ID "${shortcutId}" is not registered.`);
+      throw KeyboardShortcutsErrorFactory.cannotActivateShortcut(shortcutId);
     }
     
     this.activeShortcuts.add(shortcutId);
-    this.updateSignals();
+    this.updateState();
   }
 
   /**
    * Deactivate a single keyboard shortcut
-   * @throws Error if shortcut ID doesn't exist
+   * @throws KeyboardShortcutError if shortcut ID doesn't exist
    */
   deactivate(shortcutId: string): void {
     if (!this.shortcuts.has(shortcutId)) {
-      throw new Error(`Cannot deactivate: Keyboard shortcut with ID "${shortcutId}" is not registered.`);
+      throw KeyboardShortcutsErrorFactory.cannotDeactivateShortcut(shortcutId);
     }
     
     this.activeShortcuts.delete(shortcutId);
-    this.updateSignals();
+    this.updateState();
   }
 
   /**
    * Activate a group of keyboard shortcuts
-   * @throws Error if group ID doesn't exist
+   * @throws KeyboardShortcutError if group ID doesn't exist
    */
   activateGroup(groupId: string): void {
     const group = this.groups.get(groupId);
     if (!group) {
-      throw new Error(`Cannot activate: Keyboard shortcut group with ID "${groupId}" is not registered.`);
+      throw KeyboardShortcutsErrorFactory.cannotActivateGroup(groupId);
     }
     
-    group.active = true;
-    this.activeGroups.add(groupId);
-    group.shortcuts.forEach(shortcut => {
-      this.activeShortcuts.add(shortcut.id);
+    this.batchUpdate(() => {
+      group.active = true;
+      this.activeGroups.add(groupId);
+      group.shortcuts.forEach(shortcut => {
+        this.activeShortcuts.add(shortcut.id);
+      });
     });
-    this.updateSignals();
   }
 
   /**
    * Deactivate a group of keyboard shortcuts
-   * @throws Error if group ID doesn't exist
+   * @throws KeyboardShortcutError if group ID doesn't exist
    */
   deactivateGroup(groupId: string): void {
     const group = this.groups.get(groupId);
     if (!group) {
-      throw new Error(`Cannot deactivate: Keyboard shortcut group with ID "${groupId}" is not registered.`);
+      throw KeyboardShortcutsErrorFactory.cannotDeactivateGroup(groupId);
     }
     
-    group.active = false;
-    this.activeGroups.delete(groupId);
-    group.shortcuts.forEach(shortcut => {
-      this.activeShortcuts.delete(shortcut.id);
+    this.batchUpdate(() => {
+      group.active = false;
+      this.activeGroups.delete(groupId);
+      group.shortcuts.forEach(shortcut => {
+        this.activeShortcuts.delete(shortcut.id);
+      });
     });
-    this.updateSignals();
   }
 
   /**

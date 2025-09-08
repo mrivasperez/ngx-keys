@@ -44,8 +44,8 @@ describe('NgxKeys', () => {
 
     fixture.detectChanges();
     
-    expect(keyboardService.activeShortcutsUI().length).toBe(1);
-    expect(keyboardService.allShortcutsUI().length).toBe(1);
+    expect(keyboardService.shortcuts$().active.length).toBe(1);
+    expect(keyboardService.shortcutsUI$().all.length).toBe(1);
   });
 
   it('should update when shortcuts are activated/deactivated', () => {
@@ -61,9 +61,9 @@ describe('NgxKeys', () => {
     keyboardService.deactivate('test');
     fixture.detectChanges();
     
-    expect(keyboardService.activeShortcutsUI().length).toBe(0);
-    expect(keyboardService.inactiveShortcutsUI().length).toBe(1);
-    expect(keyboardService.allShortcutsUI().length).toBe(1);
+    expect(keyboardService.shortcuts$().active.length).toBe(0);
+    expect(keyboardService.shortcuts$().inactive.length).toBe(1);
+    expect(keyboardService.shortcutsUI$().all.length).toBe(1);
   });
 
   it('should update when groups are registered', () => {
@@ -80,8 +80,8 @@ describe('NgxKeys', () => {
     keyboardService.registerGroup('editing', shortcuts);
     fixture.detectChanges();
     
-    expect(keyboardService.activeGroupIds().length).toBe(1);
-    expect(keyboardService.activeGroupIds()).toContain('editing');
+    expect(keyboardService.shortcuts$().groups.active.length).toBe(1);
+    expect(keyboardService.shortcuts$().groups.active).toContain('editing');
   });
 
   it('should render keyboard shortcuts in template', () => {
@@ -156,10 +156,10 @@ describe('NgxKeys', () => {
   it('should handle empty states correctly', () => {
     fixture.detectChanges();
     
-    expect(keyboardService.activeShortcutsUI().length).toBe(0);
-    expect(keyboardService.inactiveShortcutsUI().length).toBe(0);
-    expect(keyboardService.allShortcutsUI().length).toBe(0);
-    expect(keyboardService.activeGroupIds().length).toBe(0);
+    expect(keyboardService.shortcuts$().active.length).toBe(0);
+    expect(keyboardService.shortcuts$().inactive.length).toBe(0);
+    expect(keyboardService.shortcutsUI$().all.length).toBe(0);
+    expect(keyboardService.shortcuts$().groups.active.length).toBe(0);
   });
 
   it('should display proper CSS classes', () => {
