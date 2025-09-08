@@ -1,4 +1,4 @@
-You are an expert in TypeScript, Angular, and Angular library development. This is **NgxKeys**, an Angular library project using Angular 20+ with strict TypeScript configuration and modern Angular patterns.
+You are an expert in TypeScript, Angular, and Angular library development. This is **ngx-keys**, an Angular library project using Angular 20+ with strict TypeScript configuration and modern Angular patterns.
 
 ## Project Architecture
 

@@ -1,15 +1,14 @@
-# NgxKeys
+# ngx-keys
 
 A reactive Angular library for managing keyboard shortcuts with signals-based UI integration.
 
 ## Features
 
-- 🎯 **Reactive Signals**: Track active/inactive shortcuts with Angular signals
-- 🎨 **UI Integration**: Ready-to-use computed signals for displaying shortcuts
-- 📱 **Cross-Platform**: Automatic Mac/PC key display formatting
-- 🔄 **Dynamic Management**: Add, remove, activate/deactivate shortcuts at runtime
-- 🎚️ **Group Management**: Organize shortcuts into logical groups
-- 🧪 **Fully Tested**: Comprehensive test coverage with Angular testing utilities
+- **Reactive Signals**: Track active/inactive shortcuts with Angular signals
+- **UI Integration**: Ready-to-use computed signals for displaying shortcuts
+- **Cross-Platform**: Automatic Mac/PC key display formatting
+- **Dynamic Management**: Add, remove, activate/deactivate shortcuts at runtime
+- **Group Management**: Organize shortcuts into logical groups
 
 ## Installation
 
@@ -18,52 +17,6 @@ npm install ngx-keys
 ```
 
 ## Quick Start
-
-### Basic Usage
-
-```typescript
-import { Component, OnInit, inject } from '@angular/core';
-import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
-
-@Component({
-  selector: 'app-example',
-  template: `
-    <p>Press Ctrl+S to save, F1 for help</p>
-    <p>Active shortcuts: {{ activeShortcuts().length }}</p>
-  `
-})
-export class ExampleComponent implements OnInit {
-  private keyboardService = inject(KeyboardShortcuts);
-  protected activeShortcuts = this.keyboardService.activeShortcutsUI;
-
-  ngOnInit() {
-    this.keyboardService.register({
-      id: 'save',
-      keys: ['ctrl', 's'],
-      macKeys: ['meta', 's'],
-      action: () => this.save(),
-      description: 'Save document'
-    });
-
-    this.keyboardService.register({
-      id: 'help',
-      keys: ['f1'],
-      macKeys: ['f1'],
-      action: () => this.showHelp(),
-      description: 'Show help'
-    });
-  }
-
-  private save() {
-    console.log('Document saved!');
-  }
-
-  private showHelp() {
-    console.log('Help displayed!');
-  }
-}
-```
-
 ### Displaying Shortcuts
 
 ```typescript
@@ -81,9 +34,37 @@ import { KeyboardShortcuts } from 'ngx-keys';
 })
 export class ShortcutsComponent {
   private keyboardService = inject(KeyboardShortcuts);
-  protected activeShortcuts = this.keyboardService.activeShortcutsUI;
+  protected activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
 }
 ```
+## Key Concepts
+
+### Automatic Activation
+
+> [!IMPORTANT]
+> When you register shortcuts using `register()` or `registerGroup()`, they are **automatically activated** and ready to use immediately. You don't need to call `activate()` unless you've previously deactivated them.
+
+```typescript
+// This shortcut is immediately active after registration
+this.keyboardService.register({
+  id: 'save',
+  keys: ['ctrl', 's'],
+  macKeys: ['meta', 's'],
+  action: () => this.save(),
+  description: 'Save document'
+});
+```
+
+Use the `activate()` and `deactivate()` methods for dynamic control after registration:
+
+```typescript
+// Temporarily disable a shortcut
+this.keyboardService.deactivate('save');
+
+// Re-enable it later
+this.keyboardService.activate('save');
+```
+
 ## API Reference
 
 ### KeyboardShortcuts Service
@@ -91,18 +72,16 @@ export class ShortcutsComponent {
 #### Methods
 
 **Registration Methods:**
-- `register(shortcut: KeyboardShortcut)` - Register a single shortcut ⚠️ *Throws error on conflicts*
-- `registerGroup(groupId: string, shortcuts: KeyboardShortcut[])` - Register a group of shortcuts ⚠️ *Throws error on conflicts*
-- `tryRegister(shortcut: KeyboardShortcut)` - Safe registration, returns `{success: boolean, conflicts: object}`
-- `tryRegisterGroup(groupId: string, shortcuts: KeyboardShortcut[])` - Safe group registration with detailed conflict info
+- `register(shortcut: KeyboardShortcut)` - Register and automatically activate a single shortcut *Throws error on conflicts*
+- `registerGroup(groupId: string, shortcuts: KeyboardShortcut[])` - Register and automatically activate a group of shortcuts *Throws error on conflicts*
 
 **Management Methods:**
-- `unregister(shortcutId: string)` - Remove a shortcut ⚠️ *Throws error if not found*
-- `unregisterGroup(groupId: string)` - Remove a group ⚠️ *Throws error if not found*
-- `activate(shortcutId: string)` - Activate a shortcut ⚠️ *Throws error if not registered*
-- `deactivate(shortcutId: string)` - Deactivate a shortcut ⚠️ *Throws error if not registered*
-- `activateGroup(groupId: string)` - Activate all shortcuts in a group ⚠️ *Throws error if not found*
-- `deactivateGroup(groupId: string)` - Deactivate all shortcuts in a group ⚠️ *Throws error if not found*
+- `unregister(shortcutId: string)` - Remove a shortcut *Throws error if not found*
+- `unregisterGroup(groupId: string)` - Remove a group *Throws error if not found*
+- `activate(shortcutId: string)` - Activate a shortcut *Throws error if not registered*
+- `deactivate(shortcutId: string)` - Deactivate a shortcut *Throws error if not registered*
+- `activateGroup(groupId: string)` - Activate all shortcuts in a group *Throws error if not found*
+- `deactivateGroup(groupId: string)` - Deactivate all shortcuts in a group *Throws error if not found*
 
 **Query Methods:**
 - `isActive(shortcutId: string): boolean` - Check if a shortcut is active
@@ -112,28 +91,37 @@ export class ShortcutsComponent {
 - `getShortcuts(): ReadonlyMap<string, KeyboardShortcut>` - Get all registered shortcuts
 - `getGroups(): ReadonlyMap<string, KeyboardShortcutGroup>` - Get all registered groups
 
+**Utility Methods:**
+- `formatShortcutForUI(shortcut: KeyboardShortcut): KeyboardShortcutUI` - Format a shortcut for display
+- `batchUpdate(operations: () => void): void` - Batch multiple operations to reduce signal updates
+
 #### Reactive Signals
 
 The service provides reactive signals for UI integration:
 
 ```typescript
-// All active shortcuts with formatted keys for display
-activeShortcutsUI: Signal<ShortcutUI[]>
+// Primary signal containing all shortcut state
+shortcuts$: Signal<{
+  active: KeyboardShortcut[];
+  inactive: KeyboardShortcut[];
+  all: KeyboardShortcut[];
+  groups: {
+    active: string[];
+    inactive: string[];
+  };
+}>
 
-// All inactive shortcuts with formatted keys for display  
-inactiveShortcutsUI: Signal<ShortcutUI[]>
-
-// Combined view of all registered shortcuts
-allShortcutsUI: Signal<ShortcutUI[]>
-
-// Active and inactive group IDs
-activeGroupIds: Signal<string[]>
-inactiveGroupIds: Signal<string[]>
+// Pre-formatted UI signal for easy display
+shortcutsUI$: Signal<{
+  active: ShortcutUI[];
+  inactive: ShortcutUI[];
+  all: ShortcutUI[];
+}>
 ```
 
 **ShortcutUI Interface:**
 ```typescript
-interface ShortcutUI {
+interface KeyboardShortcutUI {
   id: string;           // Shortcut identifier
   keys: string;         // Formatted PC/Linux keys (e.g., "Ctrl+S")
   macKeys: string;      // Formatted Mac keys (e.g., "⌘+S")
@@ -183,9 +171,10 @@ interface KeyboardShortcutGroup {
 | Editing | `insert`, `delete`, `backspace` |
 | Other | `escape`, `tab`, `enter`, `space` |
 
-## ⚠️ Browser Conflicts Warning
+## Browser Conflicts Warning
 
-**Important**: Some key combinations conflict with browser defaults. Use these with caution:
+> [!WARNING]
+> Some key combinations conflict with browser defaults. Use these with caution:
 
 ### High-Risk Combinations (avoid these)
 - `Ctrl+N` / `⌘+N` - New tab/window
@@ -203,40 +192,49 @@ interface KeyboardShortcutGroup {
 
 ### Testing Browser Conflicts
 
-Always test your shortcuts across different browsers and operating systems. Consider providing alternative key combinations or allow users to customize shortcuts.
+> [!TIP]
+> Always test your shortcuts across different browsers and operating systems. Consider providing alternative key combinations or allow users to customize shortcuts.
 
 ## Advanced Usage
 
-### Safe Registration
+### Reactive UI Integration
 
 ```typescript
-import { inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { KeyboardShortcuts } from 'ngx-keys';
 
-// In a component or service
-export class MyComponent {
+@Component({
+  template: `
+    <section>
+      <h3>Active Shortcuts ({{ activeShortcuts().length }})</h3>
+      @for (shortcut of activeShortcuts(); track shortcut.id) {
+        <div>
+          <kbd>{{ shortcut.keys }}</kbd> - {{ shortcut.description }}
+        </div>
+      }
+    </section>
+
+    <section>
+      <h3>Active Groups</h3>
+      @for (groupId of activeGroups(); track groupId) {
+        <div>{{ groupId }}</div>
+      }
+    </section>
+  `
+})
+export class ShortcutsDisplayComponent {
   private keyboardService = inject(KeyboardShortcuts);
-
-  registerSaveShortcut() {
-    const result = this.keyboardService.tryRegister({
-      id: 'save',
-      keys: ['ctrl', 's'],
-      macKeys: ['meta', 's'],
-      action: () => this.save(),
-      description: 'Save document'
-    });
-
-    if (!result.success) {
-      console.log('Registration failed:', result.conflicts);
-    }
-  }
-
-  private save() {
-    // Implementation
-  }
+  
+  // Access formatted shortcuts for display
+  protected activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
+  protected inactiveShortcuts = () => this.keyboardService.shortcutsUI$().inactive;
+  protected allShortcuts = () => this.keyboardService.shortcutsUI$().all;
+  
+  // Access group information
+  protected activeGroups = () => this.keyboardService.shortcuts$().groups.active;
+  protected inactiveGroups = () => this.keyboardService.shortcuts$().groups.inactive;
 }
 ```
-
 ### Group Management
 
 ```typescript
@@ -254,9 +252,17 @@ export class FeatureComponent implements OnInit, OnDestroy {
         macKeys: ['meta', 'x'],
         action: () => this.cut(),
         description: 'Cut selection'
+      },
+      {
+        id: 'copy',
+        keys: ['ctrl', 'c'],
+        macKeys: ['meta', 'c'],
+        action: () => this.copy(),
+        description: 'Copy selection'
       }
     ];
 
+    // Group is automatically activated when registered
     this.keyboardService.registerGroup('edit-shortcuts', shortcuts);
   }
 
@@ -273,6 +279,45 @@ export class FeatureComponent implements OnInit, OnDestroy {
   }
 
   private cut() { /* implementation */ }
+  private copy() { /* implementation */ }
+}
+```
+
+### Batch Operations
+
+For better performance when making multiple changes, use the `batchUpdate` method:
+
+```typescript
+import { Component, inject } from '@angular/core';
+import { KeyboardShortcuts } from 'ngx-keys';
+
+export class BatchUpdateComponent {
+  private keyboardService = inject(KeyboardShortcuts);
+
+  setupMultipleShortcuts() {
+    // Batch multiple operations to reduce signal updates
+    // Note: Shortcuts are automatically activated when registered
+    this.keyboardService.batchUpdate(() => {
+      this.keyboardService.register({
+        id: 'action1',
+        keys: ['ctrl', '1'],
+        macKeys: ['meta', '1'],
+        action: () => this.action1(),
+        description: 'Action 1'
+      });
+
+      this.keyboardService.register({
+        id: 'action2',
+        keys: ['ctrl', '2'],
+        macKeys: ['meta', '2'],
+        action: () => this.action2(),
+        description: 'Action 2'
+      });
+    });
+  }
+
+  private action1() { /* implementation */ }
+  private action2() { /* implementation */ }
 }
 ```
 
@@ -316,7 +361,7 @@ ng test ngx-keys
 
 ## License
 
-MIT © [NgxKeys Contributors](LICENSE)
+MIT © [ngx-keys Contributors](LICENSE)
 
 ## Contributing
 
