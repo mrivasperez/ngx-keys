@@ -167,28 +167,41 @@ export class CustomizeComponent {
     private keyupListener: ((e: KeyboardEvent) => void) | null = null;
 
     constructor() {
-        // Register all actions with their keyboard shortcuts
-        this.actions.forEach(action => this.registerAction(action));
+        // Register all actions as a group
+        this.registerAllActions();
         this.actionService.setAction('✅ Customize page loaded with 4 customizable actions');
 
         // Setup cleanup on destroy
         this.destroyRef.onDestroy(() => {
             this.cancelRecording();
-            // Unregister all shortcuts when leaving the page
-            this.actions.forEach(action => {
-                if (this.keyboardService.isRegistered(action.id)) {
-                    this.keyboardService.unregister(action.id);
-                }
-            });
+            // Unregister the entire group when leaving the page
+            this.keyboardService.unregisterGroup('customize-actions');
         });
     }
 
+    private registerAllActions() {
+        const shortcuts: KeyboardShortcut[] = this.actions.map(action => ({
+            id: action.id,
+            keys: action.keys,
+            macKeys: action.macKeys,
+            description: action.description,
+            action: () => this.executeAction(action)
+        }));
+
+        try {
+            this.keyboardService.registerGroup('customize-actions', shortcuts);
+        } catch (error) {
+            console.warn('Could not register customize actions group:', error);
+        }
+    }
+
     private registerAction(action: Action) {
-        // Unregister first if already registered
+        // Unregister the existing shortcut if it exists
         if (this.keyboardService.isRegistered(action.id)) {
             this.keyboardService.unregister(action.id);
         }
 
+        // Register the updated shortcut
         const shortcut: KeyboardShortcut = {
             id: action.id,
             keys: action.keys,
@@ -201,7 +214,6 @@ export class CustomizeComponent {
             this.keyboardService.register(shortcut);
         } catch (error) {
             console.warn(`Could not register shortcut for ${action.name}:`, error);
-            // If there's a conflict, just register without the shortcut for now
         }
     }
 
