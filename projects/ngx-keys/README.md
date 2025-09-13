@@ -35,8 +35,8 @@ import { KeyboardShortcuts } from 'ngx-keys';
   `
 })
 export class ShortcutsComponent {
-  private keyboardService = inject(KeyboardShortcuts);
-  protected activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
+  private readonly keyboardService = inject(KeyboardShortcuts);
+  protected readonly activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
 }
 ```
 ## Key Concepts
@@ -225,28 +225,29 @@ import { KeyboardShortcuts } from 'ngx-keys';
   `
 })
 export class ShortcutsDisplayComponent {
-  private keyboardService = inject(KeyboardShortcuts);
+  private readonly keyboardService = inject(KeyboardShortcuts);
   
   // Access formatted shortcuts for display
-  protected activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
-  protected inactiveShortcuts = () => this.keyboardService.shortcutsUI$().inactive;
-  protected allShortcuts = () => this.keyboardService.shortcutsUI$().all;
+  protected readonly activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
+  protected readonly inactiveShortcuts = () => this.keyboardService.shortcutsUI$().inactive;
+  protected readonly allShortcuts = () => this.keyboardService.shortcutsUI$().all;
   
   // Access group information
-  protected activeGroups = () => this.keyboardService.shortcuts$().groups.active;
-  protected inactiveGroups = () => this.keyboardService.shortcuts$().groups.inactive;
+  protected readonly activeGroups = () => this.keyboardService.shortcuts$().groups.active;
+  protected readonly inactiveGroups = () => this.keyboardService.shortcuts$().groups.inactive;
 }
 ```
 ### Group Management
 
 ```typescript
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
 import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
 
-export class FeatureComponent implements OnInit, OnDestroy {
-  private keyboardService = inject(KeyboardShortcuts);
+export class FeatureComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+  private readonly destroyRef = inject(DestroyRef);
 
-  ngOnInit() {
+  constructor() {
     const shortcuts: KeyboardShortcut[] = [
       {
         id: 'cut',
@@ -266,10 +267,11 @@ export class FeatureComponent implements OnInit, OnDestroy {
 
     // Group is automatically activated when registered
     this.keyboardService.registerGroup('edit-shortcuts', shortcuts);
-  }
 
-  ngOnDestroy() {
-    this.keyboardService.unregisterGroup('edit-shortcuts');
+    // Setup cleanup on destroy
+    this.destroyRef.onDestroy(() => {
+      this.keyboardService.unregisterGroup('edit-shortcuts');
+    });
   }
 
   toggleEditMode(enabled: boolean) {
@@ -294,9 +296,13 @@ import { Component, inject } from '@angular/core';
 import { KeyboardShortcuts } from 'ngx-keys';
 
 export class BatchUpdateComponent {
-  private keyboardService = inject(KeyboardShortcuts);
+  private readonly keyboardService = inject(KeyboardShortcuts);
 
-  setupMultipleShortcuts() {
+  constructor() {
+    this.setupMultipleShortcuts();
+  }
+
+  private setupMultipleShortcuts() {
     // Batch multiple operations to reduce signal updates
     // Note: Shortcuts are automatically activated when registered
     this.keyboardService.batchUpdate(() => {
@@ -326,11 +332,11 @@ export class BatchUpdateComponent {
 ### Checking Status
 
 ```typescript
-import { inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { KeyboardShortcuts } from 'ngx-keys';
 
 export class MyComponent {
-  private keyboardService = inject(KeyboardShortcuts);
+  private readonly keyboardService = inject(KeyboardShortcuts);
 
   checkAndActivate() {
     // Check before performing operations
