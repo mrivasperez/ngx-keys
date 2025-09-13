@@ -19,14 +19,21 @@ npm install ngx-keys
 ```
 
 ## Quick Start
-### Displaying Shortcuts
+
+### Register and Display Shortcuts
+>[!NOTE]
+For related shortcuts, use groups for easier management (*[See group management section](#group-management)*).
 
 ```typescript
-import { Component, inject } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
 import { KeyboardShortcuts } from 'ngx-keys';
 
 @Component({
   template: `
+    <h3>My App</h3>
+    <p>Last action: {{ lastAction }}</p>
+    
+    <h4>Available Shortcuts:</h4>
     @for (shortcut of activeShortcuts(); track shortcut.id) {
       <div>
         <kbd>{{ shortcut.keys }}</kbd> - {{ shortcut.description }}
@@ -34,11 +41,69 @@ import { KeyboardShortcuts } from 'ngx-keys';
     }
   `
 })
-export class ShortcutsComponent {
+export class MyComponent {
   private readonly keyboardService = inject(KeyboardShortcuts);
+  private readonly destroyRef = inject(DestroyRef);
+  
+  protected lastAction = 'Try pressing Ctrl+S or Ctrl+H';
   protected readonly activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
+
+  constructor() {
+    // Register individual shortcuts (automatically activated)
+    this.keyboardService.register({
+      id: 'save',
+      keys: ['ctrl', 's'],
+      macKeys: ['meta', 's'], 
+      action: () => this.save(),
+      description: 'Save document'
+    });
+
+    this.keyboardService.register({
+      id: 'help',
+      keys: ['ctrl', 'h'],
+      macKeys: ['meta', 'h'],
+      action: () => this.showHelp(),
+      description: 'Show help'
+    });
+
+    // Clean up on component destroy
+    this.destroyRef.onDestroy(() => {
+      this.keyboardService.unregister('save');
+      this.keyboardService.unregister('help');
+    });
+  }
+
+  private save() {
+    this.lastAction = 'Document saved!';
+  }
+
+  private showHelp() {
+    this.lastAction = 'Help displayed!';
+  }
 }
 ```
+
+
+
+## Explore the Demo
+
+Want to see ngx-keys in action? Check out our comprehensive [demo application](/projects/demo) with:
+
+| Component                                                                          | Purpose                    | Key Features                                  |
+| ---------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------- |
+| [**App Component**](/projects/demo/src/app/app.ts)                                 | Global shortcuts           | Single & group registration, cleanup patterns |
+| [**Home Component**](/projects/demo/src/app/home/home.component.ts)                | Reactive UI                | Real-time status display, toggle controls     |
+| [**Feature Component**](/projects/demo/src/app/feature/feature.component.ts)       | Route-specific shortcuts   | Scoped shortcuts, lifecycle management        |
+| [**Customize Component**](/projects/demo/src/app/customize/customize.component.ts) | Dynamic shortcut recording | Real-time key capture, shortcut customization |
+
+**Run the demo:**
+```bash
+git clone https://github.com/mrivasperez/ngx-keys
+cd ngx-keys
+npm install
+npm start
+```
+
 ## Key Concepts
 
 ### Automatic Activation
@@ -157,21 +222,21 @@ interface KeyboardShortcutGroup {
 
 ### Modifier Keys
 
-| PC/Linux | Mac | Description |
-|----------|-----|-------------|
-| `ctrl` | `meta` | Control/Command key |
-| `alt` | `alt` | Alt/Option key |
-| `shift` | `shift` | Shift key |
+| PC/Linux | Mac     | Description         |
+| -------- | ------- | ------------------- |
+| `ctrl`   | `meta`  | Control/Command key |
+| `alt`    | `alt`   | Alt/Option key      |
+| `shift`  | `shift` | Shift key           |
 
 ### Special Keys
 
-| Key | Value |
-|-----|-------|
-| Function keys | `f1`, `f2`, `f3`, ... `f12` |
-| Arrow keys | `arrowup`, `arrowdown`, `arrowleft`, `arrowright` |
-| Navigation | `home`, `end`, `pageup`, `pagedown` |
-| Editing | `insert`, `delete`, `backspace` |
-| Other | `escape`, `tab`, `enter`, `space` |
+| Key           | Value                                             |
+| ------------- | ------------------------------------------------- |
+| Function keys | `f1`, `f2`, `f3`, ... `f12`                       |
+| Arrow keys    | `arrowup`, `arrowdown`, `arrowleft`, `arrowright` |
+| Navigation    | `home`, `end`, `pageup`, `pagedown`               |
+| Editing       | `insert`, `delete`, `backspace`                   |
+| Other         | `escape`, `tab`, `enter`, `space`                 |
 
 ## Browser Conflicts Warning
 
@@ -187,17 +252,18 @@ interface KeyboardShortcutGroup {
 - `Ctrl+D` / `⌘+D` - Bookmark page
 
 ### Safer Alternatives
+> [!TIP]
+> Always test your shortcuts across different browsers and operating systems. Consider providing alternative key combinations or allow users to customize shortcuts.
 - Function keys: `F1`, `F2`, `F3`, etc.
 - Custom combinations: `Ctrl+Shift+S`, `Alt+Enter`
 - Arrow keys with modifiers: `Ctrl+ArrowUp`
 - Application-specific: `Ctrl+K`, `Ctrl+P` (if not conflicting)
 
-### Testing Browser Conflicts
-
-> [!TIP]
-> Always test your shortcuts across different browsers and operating systems. Consider providing alternative key combinations or allow users to customize shortcuts.
 
 ## Advanced Usage
+
+> [!TIP]
+Check out our [demo application](/projects/demo/src/app) for full implementations of all patterns shown below.
 
 ### Reactive UI Integration
 
@@ -238,6 +304,9 @@ export class ShortcutsDisplayComponent {
 }
 ```
 ### Group Management
+
+> [!NOTE]
+> **Live Example**: See this pattern in action in [feature.component.ts](/projects/demo/src/app/feature/feature.component.ts)
 
 ```typescript
 import { Component, DestroyRef, inject } from '@angular/core';
@@ -289,7 +358,7 @@ export class FeatureComponent {
 
 ### Batch Operations
 
-For better performance when making multiple changes, use the `batchUpdate` method:
+For better performance when making multiple changes, use the `batchUpdate` method.
 
 ```typescript
 import { Component, inject } from '@angular/core';
@@ -330,6 +399,9 @@ export class BatchUpdateComponent {
 ```
 
 ### Checking Status
+
+> [!NOTE]
+> See status checking in [home.component.ts](/projects/demo/src/app/home/home.component.ts)
 
 ```typescript
 import { Component, inject } from '@angular/core';
