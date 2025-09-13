@@ -5,69 +5,8 @@ import { ActionService } from '../app';
 @Component({
   selector: 'app-feature',
   imports: [],
-  template: `
-    <h2>Feature Page</h2>
-    <p>This page has its own set of keyboard shortcuts that are only active when you're on this route.</p>
-    
-    <p><strong>Last Action:</strong> {{ actionService.lastAction() }}</p>
-    <small>Total Actions: {{ actionService.count() }}</small>
-
-    <section class="controls">
-      <button (click)="toggleFeatureGroup()">
-        Toggle Feature Shortcuts ({{ getFeatureGroupStatus() }})
-      </button>
-      <button (click)="refreshData()">
-        Refresh Data (F5)
-      </button>
-    </section>
-
-    <section>
-      <h3>Feature-Specific Shortcuts:</h3>
-      <ul>
-        <li><kbd>F1</kbd> - Show feature help</li>
-        <li><kbd>F5</kbd> - Refresh data</li>
-        <li><kbd>Ctrl+D</kbd> / <kbd>⌘+D</kbd> - Delete item</li>
-        <li><kbd>Escape</kbd> - Cancel operation</li>
-      </ul>
-    </section>
-
-    <section class="shortcuts-display">
-      <fieldset>
-        <legend>🟢 Active Feature Shortcuts ({{ activeFeatureShortcuts().length }})</legend>
-        @if (activeFeatureShortcuts().length > 0) {
-          <ol>
-            @for (shortcut of activeFeatureShortcuts(); track shortcut.id) {
-              <li>
-                <kbd>{{ shortcut.keys }}</kbd> - {{ shortcut.description }}
-              </li>
-            }
-          </ol>
-        } @else {
-          <p><em>No active feature shortcuts</em></p>
-        }
-      </fieldset>
-
-      <fieldset>
-        <legend>📊 All Active Shortcuts ({{ allActiveShortcuts().length }})</legend>
-        <small>Including shortcuts from other routes</small>
-        @if (allActiveShortcuts().length > 0) {
-          <ol>
-            @for (shortcut of allActiveShortcuts(); track shortcut.id) {
-              <li>
-                <kbd>{{ shortcut.keys }}</kbd> - {{ shortcut.description }}
-                @if (shortcut.macKeys !== shortcut.keys) {
-                  <br><small>Mac: <kbd>{{ shortcut.macKeys }}</kbd></small>
-                }
-              </li>
-            }
-          </ol>
-        } @else {
-          <p><em>No active shortcuts</em></p>
-        }
-      </fieldset>
-    </section>
-  `,
-  styles: ``
+  templateUrl: './feature.component.html',
+  styleUrl: './feature.component.css'
 })
 export class FeatureComponent {
   private readonly keyboardService = inject(KeyboardShortcuts);

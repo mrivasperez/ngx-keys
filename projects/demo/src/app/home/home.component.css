@@ -1,0 +1,98 @@
+/* Home component styles */
+.controls {
+  margin: 2rem 0;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.controls button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.controls button:hover {
+  background: #e0e0e0;
+}
+
+.shortcuts-display {
+  margin: 2rem 0;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.shortcuts-display fieldset {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 0;
+}
+
+.shortcuts-display legend {
+  padding: 0 0.5rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.shortcuts-display ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.shortcuts-display li {
+  margin: 0.5rem 0;
+}
+
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.shortcuts-grid article {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 1rem;
+  background: #fafafa;
+}
+
+.shortcuts-grid h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.shortcuts-grid p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+kbd {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  color: #333;
+  display: inline-block;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85em;
+  font-weight: bold;
+  line-height: 1;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .controls {
+    flex-direction: column;
+  }
+  
+  .shortcuts-grid {
+    grid-template-columns: 1fr;
+  }
+}

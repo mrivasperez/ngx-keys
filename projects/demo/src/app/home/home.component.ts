@@ -5,87 +5,8 @@ import { ActionService } from '../app';
 @Component({
   selector: 'app-home',
   imports: [],
-  template: `
-    <h2>Home Page</h2>
-    <p>This page demonstrates global keyboard shortcuts that work on all routes.</p>
-    
-    <p><strong>Last Action:</strong> {{ actionService.lastAction() }}</p>
-    <small>Total Actions: {{ actionService.count() }}</small>
-
-    <section class="controls">
-      <button (click)="toggleSaveShortcut()">
-        Toggle Save ({{ getSaveShortcutStatus() }})
-      </button>
-      <button (click)="toggleEditingGroup()">
-        Toggle Editing Group ({{ getEditingGroupStatus() }})
-      </button>
-    </section>
-
-    <section class="shortcuts-display">
-      <fieldset>
-        <legend>🟢 Active Shortcuts ({{ activeShortcuts().length }})</legend>
-        @if (activeShortcuts().length > 0) {
-          <ol>
-            @for (shortcut of activeShortcuts(); track shortcut.id) {
-              <li>
-                <kbd>{{ shortcut.keys }}</kbd> - {{ shortcut.description }}
-              </li>
-            }
-          </ol>
-        } @else {
-          <p><em>No active shortcuts</em></p>
-        }
-      </fieldset>
-
-      <fieldset>
-        <legend>🔴 Inactive Shortcuts ({{ inactiveShortcuts().length }})</legend>
-        @if (inactiveShortcuts().length > 0) {
-          <ol>
-            @for (shortcut of inactiveShortcuts(); track shortcut.id) {
-              <li>
-                <kbd>{{ shortcut.keys }}</kbd> - {{ shortcut.description }}
-              </li>
-            }
-          </ol>
-        } @else {
-          <p><em>All shortcuts are active!</em></p>
-        }
-      </fieldset>
-
-      <fieldset>
-        <legend>📁 Active Groups ({{ activeGroups().length }})</legend>
-        @if (activeGroups().length > 0) {
-          <ol>
-            @for (groupId of activeGroups(); track groupId) {
-              <li>{{ groupId }}</li>
-            }
-          </ol>
-        } @else {
-          <p><em>No active groups</em></p>
-        }
-      </fieldset>
-    </section>
-
-    <section>
-      <fieldset>
-        <legend>📋 All Registered Shortcuts ({{ allShortcuts().length }})</legend>
-        <div class="shortcuts-grid">
-          @for (shortcut of allShortcuts(); track shortcut.id) {
-            <article>
-              <h3>
-                <kbd>{{ shortcut.keys }}</kbd>
-                @if (shortcut.macKeys !== shortcut.keys) {
-                  <br><small>Mac: <kbd>{{ shortcut.macKeys }}</kbd></small>
-                }
-              </h3>
-              <p>{{ shortcut.description }}</p>
-            </article>
-          }
-        </div>
-      </fieldset>
-    </section>
-  `,
-  styles: ``
+  templateUrl: './home.component.html',
+  styleUrl: './home.component.css'
 })
 export class HomeComponent {
   private readonly keyboardService = inject(KeyboardShortcuts);

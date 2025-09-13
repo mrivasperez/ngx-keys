@@ -1,0 +1,160 @@
+/* Customize component styles */
+.recording-status {
+  background: #ffe6e6;
+  border: 2px solid #ff4444;
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.recording-status button {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #fff;
+  border: 1px solid #ff4444;
+  border-radius: 4px;
+  color: #ff4444;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.recording-status button:hover {
+  background: #ff4444;
+  color: #fff;
+}
+
+.actions-list {
+  margin: 2rem 0;
+}
+
+.actions-list h3 {
+  color: #333;
+  margin: 1.5rem 0 1rem 0;
+}
+
+.action-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  margin: 1rem 0;
+  gap: 1rem;
+  background: #fefefe;
+}
+
+.action-item:hover {
+  border-color: #999;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-info {
+  flex: 1;
+}
+
+.action-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.action-info p {
+  margin: 0 0 0.5rem 0;
+  color: #666;
+  line-height: 1.4;
+}
+
+.current-shortcut {
+  font-size: 0.9em;
+  color: #555;
+}
+
+.action-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 120px;
+}
+
+.action-controls button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.action-controls button:hover:not(:disabled) {
+  background: #e0e0e0;
+  border-color: #999;
+}
+
+.action-controls button:disabled {
+  background: #f0f0f0;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.instructions {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #ccc;
+}
+
+.instructions h3 {
+  color: #333;
+  margin: 0 0 1rem 0;
+}
+
+.instructions ol {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 1rem 1.5rem;
+  margin: 1rem 0;
+}
+
+.instructions li {
+  margin: 0.5rem 0;
+  color: #495057;
+  line-height: 1.4;
+}
+
+.instructions p {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  color: #856404;
+}
+
+kbd {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  color: #333;
+  display: inline-block;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85em;
+  font-weight: bold;
+  line-height: 1;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .action-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .action-controls {
+    flex-direction: row;
+    justify-content: center;
+    min-width: auto;
+  }
+}
