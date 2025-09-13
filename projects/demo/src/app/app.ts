@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Injectable, signal } from '@angular/core';
+import { Component, DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
 
@@ -28,15 +28,14 @@ export class ActionService {
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
-export class App implements OnInit, OnDestroy {
+export class App {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+  private readonly actionService = inject(ActionService);
+  private readonly destroyRef = inject(DestroyRef);
+
   protected readonly title = 'NgxKeys Demo';
 
-  constructor(
-    private keyboardService: KeyboardShortcuts,
-    private actionService: ActionService
-  ) {}
-
-  ngOnInit() {
+  constructor() {
     // Register global shortcuts that are active on all routes
     this.keyboardService.register({
       id: 'save',
@@ -80,13 +79,14 @@ export class App implements OnInit, OnDestroy {
     ];
 
     this.keyboardService.registerGroup('editing', editingShortcuts);
-  }
 
-  ngOnDestroy() {
-    // Clean up global shortcuts
-    this.keyboardService.unregister('save');
-    this.keyboardService.unregister('help');
-    this.keyboardService.unregisterGroup('editing');
+    // Setup cleanup on destroy
+    this.destroyRef.onDestroy(() => {
+      // Clean up global shortcuts
+      this.keyboardService.unregister('save');
+      this.keyboardService.unregister('help');
+      this.keyboardService.unregisterGroup('editing');
+    });
   }
 
   private handleSave() {

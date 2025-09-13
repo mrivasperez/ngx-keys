@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { KeyboardShortcuts, KeyboardShortcutUI } from 'ngx-keys';
 import { ActionService } from '../app';
 
@@ -87,25 +87,17 @@ import { ActionService } from '../app';
   `,
   styles: ``
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+  protected readonly actionService = inject(ActionService);
+
   // Reactive signals from the keyboard service
-  protected readonly activeShortcuts;
-  protected readonly inactiveShortcuts;
-  protected readonly allShortcuts;
-  protected readonly activeGroups;
+  protected readonly activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
+  protected readonly inactiveShortcuts = () => this.keyboardService.shortcutsUI$().inactive;
+  protected readonly allShortcuts = () => this.keyboardService.shortcutsUI$().all;
+  protected readonly activeGroups = () => this.keyboardService.shortcuts$().groups.active;
 
-  constructor(
-    private keyboardService: KeyboardShortcuts,
-    protected actionService: ActionService
-  ) {
-    // Initialize reactive signals after service injection
-    this.activeShortcuts = () => this.keyboardService.shortcutsUI$().active;
-    this.inactiveShortcuts = () => this.keyboardService.shortcutsUI$().inactive;
-    this.allShortcuts = () => this.keyboardService.shortcutsUI$().all;
-    this.activeGroups = () => this.keyboardService.shortcuts$().groups.active;
-  }
-
-  ngOnInit() {
+  constructor() {
     // Component is ready - no need to register shortcuts as they're global now
   }
 

@@ -1,4 +1,4 @@
-import { Component, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
 import { KeyboardShortcuts, KeyboardShortcut, KeyboardShortcutUI } from 'ngx-keys';
 import { ActionService } from '../app';
 
@@ -69,25 +69,21 @@ import { ActionService } from '../app';
   `,
   styles: ``
 })
-export class FeatureComponent implements OnInit, OnDestroy {
+export class FeatureComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+  protected readonly actionService = inject(ActionService);
+  private readonly destroyRef = inject(DestroyRef);
+
   // Reactive signals from the keyboard service
-  protected readonly allActiveShortcuts;
-  protected readonly activeFeatureShortcuts;
+  protected readonly allActiveShortcuts = () => this.keyboardService.shortcutsUI$().active;
+  // Filter for feature-specific shortcuts
+  protected readonly activeFeatureShortcuts = () => {
+    return this.keyboardService.shortcutsUI$().active.filter((shortcut: KeyboardShortcutUI) => 
+      shortcut.id.startsWith('feature-')
+    );
+  };
 
-  constructor(
-    private keyboardService: KeyboardShortcuts,
-    protected actionService: ActionService
-  ) {
-    this.allActiveShortcuts = () => this.keyboardService.shortcutsUI$().active;
-    // Filter for feature-specific shortcuts
-    this.activeFeatureShortcuts = () => {
-      return this.keyboardService.shortcutsUI$().active.filter((shortcut: KeyboardShortcutUI) => 
-        shortcut.id.startsWith('feature-')
-      );
-    };
-  }
-
-  ngOnInit() {
+  constructor() {
     // Register feature-specific shortcuts that are only active on this route
     const featureShortcuts: KeyboardShortcut[] = [
       {
@@ -122,11 +118,12 @@ export class FeatureComponent implements OnInit, OnDestroy {
 
     this.keyboardService.registerGroup('feature-shortcuts', featureShortcuts);
     this.actionService.setAction('✅ Feature shortcuts activated!');
-  }
 
-  ngOnDestroy() {
-    // Clean up feature-specific shortcuts when leaving this route
-    this.keyboardService.unregisterGroup('feature-shortcuts');
+    // Setup cleanup on destroy
+    this.destroyRef.onDestroy(() => {
+      // Clean up feature-specific shortcuts when leaving this route
+      this.keyboardService.unregisterGroup('feature-shortcuts');
+    });
   }
 
   private showFeatureHelp() {

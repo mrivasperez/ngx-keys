@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
 import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
 import { ActionService } from '../app';
 
@@ -125,7 +125,11 @@ interface Action {
     }
   `
 })
-export class CustomizeComponent implements OnInit, OnDestroy {
+export class CustomizeComponent {
+    private readonly keyboardService = inject(KeyboardShortcuts);
+    protected readonly actionService = inject(ActionService);
+    private readonly destroyRef = inject(DestroyRef);
+
     recordingFor: Action | null = null;
 
     actions: Action[] = [
@@ -162,24 +166,20 @@ export class CustomizeComponent implements OnInit, OnDestroy {
     private keydownListener: ((e: KeyboardEvent) => void) | null = null;
     private keyupListener: ((e: KeyboardEvent) => void) | null = null;
 
-    constructor(
-        private keyboardService: KeyboardShortcuts,
-        protected actionService: ActionService
-    ) { }
-
-    ngOnInit() {
+    constructor() {
         // Register all actions with their keyboard shortcuts
         this.actions.forEach(action => this.registerAction(action));
         this.actionService.setAction('✅ Customize page loaded with 4 customizable actions');
-    }
 
-    ngOnDestroy() {
-        this.cancelRecording();
-        // Unregister all shortcuts when leaving the page
-        this.actions.forEach(action => {
-            if (this.keyboardService.isRegistered(action.id)) {
-                this.keyboardService.unregister(action.id);
-            }
+        // Setup cleanup on destroy
+        this.destroyRef.onDestroy(() => {
+            this.cancelRecording();
+            // Unregister all shortcuts when leaving the page
+            this.actions.forEach(action => {
+                if (this.keyboardService.isRegistered(action.id)) {
+                    this.keyboardService.unregister(action.id);
+                }
+            });
         });
     }
 
