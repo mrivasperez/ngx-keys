@@ -1,14 +1,16 @@
 # ngx-keys
 
-A reactive Angular library for managing keyboard shortcuts with signals-based UI integration.
+A lightweight, reactive Angular service for managing keyboard shortcuts with signals-based UI integration.
 
 ## Features
 
-- **Reactive Signals**: Track active/inactive shortcuts with Angular signals
-- **UI Integration**: Ready-to-use computed signals for displaying shortcuts
-- **Cross-Platform**: Automatic Mac/PC key display formatting
-- **Dynamic Management**: Add, remove, activate/deactivate shortcuts at runtime
-- **Group Management**: Organize shortcuts into logical groups
+- **🎯 Service-Focused**: Clean, focused API without unnecessary UI components
+- **⚡ Reactive Signals**: Track active/inactive shortcuts with Angular signals
+- **🔧 UI-Agnostic**: Build your own UI using the provided reactive signals
+- **🌍 Cross-Platform**: Automatic Mac/PC key display formatting
+- **🔄 Dynamic Management**: Add, remove, activate/deactivate shortcuts at runtime
+- **📁 Group Management**: Organize shortcuts into logical groups
+- **🪶 Lightweight**: Zero dependencies, minimal bundle impact
 
 ## Installation
 
