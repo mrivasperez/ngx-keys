@@ -2,7 +2,7 @@
   "name": "ngx-keys",
   "version": "0.0.0",
   "description": "A reactive Angular library for managing keyboard shortcuts with signals-based UI integration",
-  "license": "MIT",
+  "license": "0BSD",
   "repository": {
     "type": "git",
     "url": "https://github.com/mrivasperez/ngx-keys.git"

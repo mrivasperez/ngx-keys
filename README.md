@@ -88,3 +88,9 @@ ng build demo
    ```bash
    npm publish
    ```
+
+## License
+
+0BSD © [ngx-keys Contributors](LICENSE)
+
+This project is licensed under the BSD Zero Clause License - see the [LICENSE](LICENSE) file for details.

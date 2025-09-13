@@ -14,7 +14,7 @@
     "cross-platform",
     "angular-signals"
   ],
-  "license": "MIT",
+  "license": "0BSD",
   "author": "NgxKeys Contributors",
   "repository": {
     "type": "git",

@@ -363,7 +363,7 @@ ng test ngx-keys
 
 ## License
 
-MIT © [ngx-keys Contributors](LICENSE)
+0BSD © [ngx-keys Contributors](LICENSE)
 
 ## Contributing
 
