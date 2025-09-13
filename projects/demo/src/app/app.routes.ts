@@ -10,6 +10,10 @@ export const routes: Routes = [
     loadComponent: () => import('./feature/feature.component').then(m => m.FeatureComponent)
   },
   {
+    path: 'customize',
+    loadComponent: () => import('./customize/customize.component').then(m => m.CustomizeComponent)
+  },
+  {
     path: '**',
     redirectTo: ''
   }
