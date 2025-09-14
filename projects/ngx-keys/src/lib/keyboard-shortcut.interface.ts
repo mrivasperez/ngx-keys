@@ -1,7 +1,15 @@
+export type KeyStep = string[];
+
 export interface KeyboardShortcut {
   id: string;
-  keys: string[];
-  macKeys: string[];
+  /**
+   * Single-step shortcuts keep the existing shape using `keys`/`macKeys`.
+   * For multi-step shortcuts, use `steps` (array of steps), where each step is an array of keys.
+   */
+  keys?: string[];
+  macKeys?: string[];
+  steps?: KeyStep[];
+  macSteps?: KeyStep[];
   action: () => void;
   description: string;
 }
