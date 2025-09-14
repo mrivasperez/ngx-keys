@@ -1,4 +1,4 @@
-/* Feature component styles */
+/* Layout only */
 .controls {
   margin: 2rem 0;
   display: flex;
@@ -6,85 +6,8 @@
   flex-wrap: wrap;
 }
 
-.controls button {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ccc;
-  background: #f5f5f5;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.controls button:hover {
-  background: #e0e0e0;
-}
-
-h3 {
-  color: #333;
-  margin: 1.5rem 0 1rem 0;
-}
-
-ul {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 1rem 1.5rem;
-  margin: 1rem 0;
-}
-
-ul li {
-  margin: 0.5rem 0;
-  color: #495057;
-}
-
 .shortcuts-display {
   margin: 2rem 0;
-  display: grid;
-  gap: 1.5rem;
-}
-
-.shortcuts-display fieldset {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 1rem;
-  margin: 0;
-}
-
-.shortcuts-display legend {
-  padding: 0 0.5rem;
-  font-weight: bold;
-  color: #333;
-}
-
-.shortcuts-display small {
-  color: #666;
-  font-style: italic;
-  display: block;
-  margin-bottom: 0.5rem;
-}
-
-.shortcuts-display ol {
-  margin: 0.5rem 0;
-  padding-left: 1.5rem;
-}
-
-.shortcuts-display li {
-  margin: 0.5rem 0;
-}
-
-kbd {
-  background: #f0f0f0;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
-  color: #333;
-  display: inline-block;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.85em;
-  font-weight: bold;
-  line-height: 1;
-  padding: 2px 4px;
-  white-space: nowrap;
 }
 
 @media (max-width: 768px) {
