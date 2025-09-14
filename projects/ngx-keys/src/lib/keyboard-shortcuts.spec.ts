@@ -773,6 +773,59 @@ describe('KeyboardShortcuts', () => {
       expect(action1).toHaveBeenCalled();
       expect(action2).not.toHaveBeenCalled();
     });
+
+    it('should execute multi-step shortcut when steps are pressed in order', (done) => {
+      const multiAction = jasmine.createSpy('multiAction');
+      const shortcut = {
+        id: 'multi-1',
+        steps: [['ctrl', 'k'], ['s']],
+        macSteps: [['meta', 'k'], ['s']],
+        action: multiAction,
+        description: 'Multi-step'
+      } as any as KeyboardShortcut;
+
+      service.register(shortcut);
+      const testableService = service as any;
+
+      // First step
+      const event1 = new KeyboardEvent('keydown', { ctrlKey: true, key: 'k' });
+      testableService.testHandleKeydown(event1);
+
+      // Second step
+      const event2 = new KeyboardEvent('keydown', { key: 's' });
+      // Delay slightly to simulate user pressing second key
+      setTimeout(() => {
+        testableService.testHandleKeydown(event2);
+        expect(multiAction).toHaveBeenCalled();
+        done();
+      }, 50);
+    });
+
+    it('should not execute multi-step shortcut if timeout occurs before next step', (done) => {
+      const multiAction = jasmine.createSpy('multiActionTimeout');
+      const shortcut = {
+        id: 'multi-2',
+        steps: [['ctrl', 'k'], ['s']],
+        macSteps: [['meta', 'k'], ['s']],
+        action: multiAction,
+        description: 'Multi-step timeout'
+      } as any as KeyboardShortcut;
+
+      service.register(shortcut);
+      const testableService = service as any;
+
+      // First step
+      const event1 = new KeyboardEvent('keydown', { ctrlKey: true, key: 'k' });
+      testableService.testHandleKeydown(event1);
+
+      // Wait longer than default sequenceTimeout (2s)
+      setTimeout(() => {
+        const event2 = new KeyboardEvent('keydown', { key: 's' });
+        testableService.testHandleKeydown(event2);
+        expect(multiAction).not.toHaveBeenCalled();
+        done();
+      }, 2200);
+    });
   });
 
   describe('Error Handling', () => {
