@@ -14,6 +14,10 @@ export const routes: Routes = [
     loadComponent: () => import('./customize/customize.component').then(m => m.CustomizeComponent)
   },
   {
+    path: 'multi-step',
+    loadComponent: () => import('./multi-step/multi-step.component').then(m => m.MultiStepComponent)
+  },
+  {
     path: '**',
     redirectTo: ''
   }
