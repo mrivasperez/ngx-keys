@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { KeyboardShortcuts, KeyboardShortcutUI } from 'ngx-keys';
 import { ActionService } from '../app';
 
@@ -6,7 +6,8 @@ import { ActionService } from '../app';
   selector: 'app-home',
   imports: [],
   templateUrl: './home.component.html',
-  styleUrl: './home.component.css'
+  styleUrl: './home.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class HomeComponent {
   private readonly keyboardService = inject(KeyboardShortcuts);

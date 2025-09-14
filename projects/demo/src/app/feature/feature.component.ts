@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef, inject, ChangeDetectionStrategy } from '@angular/core';
 import { KeyboardShortcuts, KeyboardShortcut, KeyboardShortcutUI } from 'ngx-keys';
 import { ActionService } from '../app';
 
@@ -6,7 +6,8 @@ import { ActionService } from '../app';
   selector: 'app-feature',
   imports: [],
   templateUrl: './feature.component.html',
-  styleUrl: './feature.component.css'
+  styleUrl: './feature.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class FeatureComponent {
   private readonly keyboardService = inject(KeyboardShortcuts);

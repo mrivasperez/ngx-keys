@@ -1,4 +1,4 @@
-import { Component, DestroyRef, Injectable, inject, signal } from '@angular/core';
+import { Component, DestroyRef, Injectable, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
 
@@ -26,7 +26,8 @@ export class ActionService {
   selector: 'app-root',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './app.html',
-  styleUrl: './app.css'
+  styleUrl: './app.css',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class App {
   private readonly keyboardService = inject(KeyboardShortcuts);

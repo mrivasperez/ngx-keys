@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef, inject, ChangeDetectionStrategy } from '@angular/core';
 import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
 import { ActionService } from '../app';
 
@@ -14,7 +14,8 @@ interface Action {
     selector: 'app-customize',
     imports: [],
     templateUrl: './customize.component.html',
-    styleUrl: './customize.component.css'
+    styleUrl: './customize.component.css',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CustomizeComponent {
     private readonly keyboardService = inject(KeyboardShortcuts);
