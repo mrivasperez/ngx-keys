@@ -29,8 +29,8 @@ export class CustomizeComponent {
             id: 'save-document',
             name: 'Save Document',
             description: 'Save the current document or form',
-            keys: ['ctrl', 's'],
-            macKeys: ['meta', 's']
+            keys: ['ctrl', 'shift', 's'],
+            macKeys: ['meta', 'shift', 's']
         },
         {
             id: 'show-help',
@@ -57,6 +57,7 @@ export class CustomizeComponent {
 
     private keydownListener: ((e: KeyboardEvent) => void) | null = null;
     private keyupListener: ((e: KeyboardEvent) => void) | null = null;
+    private groupRegistered = false;
 
     constructor() {
         // Register all actions as a group
@@ -66,12 +67,24 @@ export class CustomizeComponent {
         // Setup cleanup on destroy
         this.destroyRef.onDestroy(() => {
             this.cancelRecording();
-            // Unregister the entire group when leaving the page
-            this.keyboardService.unregisterGroup('customize-actions');
+            // Only unregister the group if it was successfully registered
+            if (this.groupRegistered) {
+                try {
+                    this.keyboardService.unregisterGroup('customize-actions');
+                } catch (error) {
+                    console.warn('Could not unregister customize actions group:', error);
+                }
+            }
         });
     }
 
     private registerAllActions() {
+        // Don't register if already registered
+        if (this.groupRegistered || this.keyboardService.isGroupRegistered('customize-actions')) {
+            console.warn('Customize actions group is already registered');
+            return;
+        }
+
         const shortcuts: KeyboardShortcut[] = this.actions.map(action => ({
             id: action.id,
             keys: action.keys,
@@ -82,8 +95,10 @@ export class CustomizeComponent {
 
         try {
             this.keyboardService.registerGroup('customize-actions', shortcuts);
+            this.groupRegistered = true;
         } catch (error) {
             console.warn('Could not register customize actions group:', error);
+            this.groupRegistered = false;
         }
     }
 
