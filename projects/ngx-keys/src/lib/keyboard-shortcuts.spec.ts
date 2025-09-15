@@ -1,6 +1,7 @@
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { KeyboardShortcut } from './keyboard-shortcut.interface';
 import { KeyboardShortcutsErrors } from './keyboard-shortcuts.errors';
+import { Subject } from 'rxjs'
 
 describe('KeyboardShortcuts', () => {
   let service: KeyboardShortcuts;
@@ -31,6 +32,14 @@ describe('KeyboardShortcuts', () => {
       public testGetPressedKeys = (event: KeyboardEvent) => this.getPressedKeys(event);
       public testKeysMatch = (pressed: string[], target: string[]) => this.keysMatch(pressed, target);
       public testIsMacPlatform = () => this.isMacPlatform();
+      
+      public testMetaKeyKeyboardEvent (type: string, keyboardEventInit: KeyboardEventInit) {
+        const isMac = this.testIsMacPlatform()
+        const controlKey = isMac ? 'metaKey' : 'ctrlKey'
+        keyboardEventInit[controlKey] = true
+
+        return new KeyboardEvent(type, keyboardEventInit)
+      }
     }
 
     service = new TestableKeyboardShortcuts();
@@ -118,6 +127,44 @@ describe('KeyboardShortcuts', () => {
 
       expect(service.getShortcuts().has('test-shortcut')).toBe(false);
       expect(service.isActive('test-shortcut')).toBe(false);
+    });
+
+    it('should handle undefined activeUntil gracefully', () => {
+      const mockAction = jasmine.createSpy('mockAction');
+
+      const shortcut: KeyboardShortcut = {
+        id: 'active-until-undefined-test',
+        keys: ['f3'],
+        macKeys: ['f3'],
+        action: mockAction,
+        description: 'without activeUntil',
+      };
+
+      expect(() => service.register(shortcut)).not.toThrow();
+      expect(service.isRegistered('active-until-undefined-test')).toBe(true);
+    });
+
+    it('should destruct shortcut via activeUntil Observable', () => {
+      const mockAction = jasmine.createSpy('mockAction');
+      
+      const activeUntilObservable = new Subject<void>()
+
+      const shortcut: KeyboardShortcut = {
+        id: 'active-until-observable-test',
+        keys: ['f3'],
+        macKeys: ['f3'],
+        action: mockAction,
+        description: 'without activeUntil',
+        activeUntil: activeUntilObservable,
+      };
+
+      expect(() => service.register(shortcut)).not.toThrow();
+      expect(service.isRegistered('active-until-observable-test')).toBe(true);
+
+      activeUntilObservable.next()
+      activeUntilObservable.complete()
+
+      expect(service.isRegistered('active-until-observable-test')).toBe(false);
     });
 
     it('should activate and deactivate individual shortcuts', () => {
@@ -369,8 +416,7 @@ describe('KeyboardShortcuts', () => {
       service.register(shortcut);
 
       const testableService = service as any;
-      const event = new KeyboardEvent('keydown', {
-        ctrlKey: true,
+      const event = testableService.testMetaKeyKeyboardEvent('keydown', {
         key: 's'
       });
 
@@ -426,8 +472,7 @@ describe('KeyboardShortcuts', () => {
       service.register({ ...mockShortcut, id: 'shortcut-2', keys: ['ctrl', 'y'], macKeys: ['meta', 'y'], action: action2 });
 
       const testableService = service as any;
-      const event = new KeyboardEvent('keydown', {
-        ctrlKey: true,
+      const event = testableService.testMetaKeyKeyboardEvent('keydown', {
         key: 'x'
       });
 
@@ -447,8 +492,7 @@ describe('KeyboardShortcuts', () => {
 
       // Simulate key press handling
       const testableService = service as any;
-      const event = new KeyboardEvent('keydown', {
-        ctrlKey: true,
+      const event = testableService.metaKeyKeyboardEvent('keydown', {
         key: 's'
       });
 
