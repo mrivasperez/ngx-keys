@@ -415,16 +415,17 @@ export class KeyboardShortcuts implements OnDestroy {
     // Build the pressed keys set used for matching. Prefer the currentlyDownKeys
     // if it contains more than one non-modifier key; otherwise fall back to the
     // traditional per-event pressed keys calculation for compatibility.
-    const pressedKeys = this.buildPressedKeysForMatch(event);
+  // Use a Set for matching to avoid allocations and sorting on every event
+  const pressedKeys = this.buildPressedKeysForMatch(event);
     const isMac = this.isMacPlatform();
     
     for (const shortcutId of this.activeShortcuts) {
       const shortcut = this.shortcuts.get(shortcutId);
       if (!shortcut) continue;
       
-      const targetKeys = isMac ? shortcut.macKeys : shortcut.keys;
-      
-      if (this.keysMatch(pressedKeys, targetKeys)) {
+  const targetKeys = isMac ? shortcut.macKeys : shortcut.keys;
+
+  if (this.keysMatch(pressedKeys, targetKeys)) {
         event.preventDefault();
         event.stopPropagation();
         
@@ -509,29 +510,39 @@ export class KeyboardShortcuts implements OnDestroy {
    * If multiple non-modifier keys are currently down, include them (chord support).
    * Otherwise fall back to single main-key detection from the event for compatibility.
    */
-  protected buildPressedKeysForMatch(event: KeyboardEvent): string[] {
-    const modifiers: string[] = [];
-    if (event.ctrlKey) modifiers.push('ctrl');
-    if (event.altKey) modifiers.push('alt');
-    if (event.shiftKey) modifiers.push('shift');
-    if (event.metaKey) modifiers.push('meta');
+  /**
+   * Build the pressed keys set used for matching against registered shortcuts.
+   * If multiple non-modifier keys are currently down, include them (chord support).
+   * Otherwise fall back to single main-key detection from the event for compatibility.
+   *
+   * Returns a Set<string> (lowercased) to allow O(1) lookups and O(n) comparisons
+   * without sorting or allocating sorted arrays on every event.
+   */
+  protected buildPressedKeysForMatch(event: KeyboardEvent): Set<string> {
+    const modifiers = new Set<string>();
+    if (event.ctrlKey) modifiers.add('ctrl');
+    if (event.altKey) modifiers.add('alt');
+    if (event.shiftKey) modifiers.add('shift');
+    if (event.metaKey) modifiers.add('meta');
 
     // Collect non-modifier keys from currentlyDownKeys (excluding modifiers)
     const nonModifierKeys = Array.from(this.currentlyDownKeys).filter(k => !['control', 'alt', 'shift', 'meta'].includes(k));
 
-    // If we have at least one non-modifier in the global set, use that set
-    // combined with current modifiers. This enables multi-non-modifier chords.
+    const result = new Set<string>();
+    // Add modifiers first
+    modifiers.forEach(m => result.add(m));
+
     if (nonModifierKeys.length > 0) {
-      return [...modifiers, ...nonModifierKeys.map(k => k.toLowerCase())];
+      nonModifierKeys.forEach(k => result.add(k.toLowerCase()));
+      return result;
     }
 
     // Fallback: single main key from the event (existing behavior)
     const key = event.key.toLowerCase();
-    const keys: string[] = [...modifiers];
     if (!['control', 'alt', 'shift', 'meta'].includes(key)) {
-      keys.push(key);
+      result.add(key);
     }
-    return keys;
+    return result;
   }
 
   protected getPressedKeys(event: KeyboardEvent): string[] {
@@ -551,16 +562,30 @@ export class KeyboardShortcuts implements OnDestroy {
     return keys;
   }
 
-  protected keysMatch(pressedKeys: string[], targetKeys: string[]): boolean {
-    if (pressedKeys.length !== targetKeys.length) {
+  /**
+   * Compare pressed keys against a target key combination.
+   * Accepts either a Set<string> (preferred) or an array for backwards compatibility.
+   * Uses Set-based comparison: sizes must match and every element in target must exist in pressed.
+   */
+  protected keysMatch(pressedKeys: Set<string> | string[], targetKeys: string[]): boolean {
+    // Normalize targetKeys into a Set<string> (lowercased)
+    const normalizedTarget = new Set<string>(targetKeys.map(k => k.toLowerCase()));
+
+    // Normalize pressedKeys into a Set<string> if it's an array
+    const pressedSet: Set<string> = Array.isArray(pressedKeys)
+      ? new Set<string>(pressedKeys.map(k => k.toLowerCase()))
+      : new Set<string>(Array.from(pressedKeys).map(k => k.toLowerCase()));
+
+    if (pressedSet.size !== normalizedTarget.size) {
       return false;
     }
-    
-    // Normalize and sort both arrays for comparison
-    const normalizedPressed = pressedKeys.map(key => key.toLowerCase()).sort();
-    const normalizedTarget = targetKeys.map(key => key.toLowerCase()).sort();
-    
-    return normalizedPressed.every((key, index) => key === normalizedTarget[index]);
+
+    for (const key of normalizedTarget) {
+      if (!pressedSet.has(key)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   protected isMacPlatform(): boolean {
