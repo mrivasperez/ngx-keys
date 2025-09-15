@@ -1,7 +1,8 @@
-import { Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
+import { DestroyRef, Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { KeyboardShortcut, KeyboardShortcutGroup, KeyboardShortcutUI } from './keyboard-shortcut.interface';
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
+import { Observable, take } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -165,13 +166,24 @@ export class KeyboardShortcuts implements OnDestroy {
     this.shortcuts.set(shortcut.id, shortcut);
     this.activeShortcuts.add(shortcut.id);
     this.updateState();
+
+    if (shortcut.until) {
+      const unregister = this.unregister.bind(this, shortcut.id);
+      if (shortcut.until === 'destruct') {
+        inject(DestroyRef).onDestroy(unregister);
+      } else if (shortcut.until instanceof DestroyRef) {
+        shortcut.until.onDestroy(unregister);
+      } else if (shortcut.until instanceof Observable) {
+        shortcut.until.pipe(take(1)).subscribe(unregister);
+      }
+    }
   }
 
   /**
    * Register multiple keyboard shortcuts as a group
    * @throws KeyboardShortcutError if group ID is already registered or if any shortcut ID or key combination conflicts
    */
-  registerGroup(groupId: string, shortcuts: KeyboardShortcut[]): void {
+  registerGroup(groupId: string, shortcuts: KeyboardShortcut[], until?: Observable<any> | DestroyRef | 'destruct'): void {
     // Check if group ID already exists
     if (this.groups.has(groupId)) {
       throw KeyboardShortcutsErrorFactory.groupAlreadyRegistered(groupId);
@@ -230,6 +242,17 @@ export class KeyboardShortcuts implements OnDestroy {
         this.activeShortcuts.add(shortcut.id);
       });
     });
+
+    if (until) {
+      const unregister = this.unregisterGroup.bind(this, groupId);
+      if (until === 'destruct') {
+        inject(DestroyRef).onDestroy(unregister);
+      } else if (until instanceof DestroyRef) {
+        until.onDestroy(unregister);
+      } else if (until instanceof Observable) {
+        until.pipe(take(1)).subscribe(unregister);
+      }
+    }
   }
 
   /**
