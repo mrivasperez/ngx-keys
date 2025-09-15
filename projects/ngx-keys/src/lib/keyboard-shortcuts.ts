@@ -55,6 +55,8 @@ export class KeyboardShortcuts implements OnDestroy {
   
   private readonly keydownListener = this.handleKeydown.bind(this);
   private readonly keyupListener = this.handleKeyup.bind(this);
+  private readonly blurListener = this.handleWindowBlur.bind(this);
+  private readonly visibilityListener = this.handleVisibilityChange.bind(this);
   private isListening = false;
   protected isBrowser: boolean;
   // Track currently physically pressed keys (lowercased). This lets us detect chords
@@ -387,6 +389,10 @@ export class KeyboardShortcuts implements OnDestroy {
     // preventDefault() when matching shortcuts.
     document.addEventListener('keydown', this.keydownListener, { passive: false });
     document.addEventListener('keyup', this.keyupListener, { passive: false });
+    // Listen for blur/visibility changes so we can clear the currently-down keys
+    // and avoid stale state when the browser or tab loses focus.
+    window.addEventListener('blur', this.blurListener);
+    document.addEventListener('visibilitychange', this.visibilityListener);
     this.isListening = true;
   }
 
@@ -397,6 +403,8 @@ export class KeyboardShortcuts implements OnDestroy {
     
     document.removeEventListener('keydown', this.keydownListener);
     document.removeEventListener('keyup', this.keyupListener);
+    window.removeEventListener('blur', this.blurListener);
+    document.removeEventListener('visibilitychange', this.visibilityListener);
     this.isListening = false;
   }
 
@@ -436,6 +444,24 @@ export class KeyboardShortcuts implements OnDestroy {
     const key = event.key ? event.key.toLowerCase() : '';
     if (key && !['control', 'alt', 'shift', 'meta'].includes(key)) {
       this.currentlyDownKeys.delete(key);
+    }
+  }
+
+  /**
+   * Clear the currently-down keys. Exposed for testing and for use by
+   * blur/visibilitychange handlers to avoid stale state when the page loses focus.
+   */
+  clearCurrentlyDownKeys(): void {
+    this.currentlyDownKeys.clear();
+  }
+
+  protected handleWindowBlur(): void {
+    this.clearCurrentlyDownKeys();
+  }
+
+  protected handleVisibilityChange(): void {
+    if (document.visibilityState === 'hidden') {
+      this.clearCurrentlyDownKeys();
     }
   }
 

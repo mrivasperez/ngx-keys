@@ -338,6 +338,32 @@ describe('KeyboardShortcuts', () => {
       expect(chordAction).not.toHaveBeenCalled();
     });
 
+    it('should clear currently-down keys and prevent stale chord matches', () => {
+      const chordAction = jasmine.createSpy('chordActionClear');
+      service.register({
+        id: 'chord-clear',
+        keys: ['m', 'n'],
+        macKeys: ['m', 'n'],
+        action: chordAction,
+        description: 'Chord M+N'
+      });
+
+      const testableService = service as any;
+
+      // Simulate m down
+      const eventM = new KeyboardEvent('keydown', { key: 'm' });
+      testableService.testHandleKeydown(eventM);
+
+      // Now simulate window blur/visibility change by calling the clear method
+      testableService.clearCurrentlyDownKeys();
+
+      // Simulate n down — chord should not trigger because the state was cleared
+      const eventN = new KeyboardEvent('keydown', { key: 'n' });
+      testableService.testHandleKeydown(eventN);
+
+      expect(chordAction).not.toHaveBeenCalled();
+    });
+
     it('should parse multiple modifier keys', () => {
       const event = new KeyboardEvent('keydown', {
         ctrlKey: true,
