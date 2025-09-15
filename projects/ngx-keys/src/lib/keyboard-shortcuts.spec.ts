@@ -295,6 +295,49 @@ describe('KeyboardShortcuts', () => {
       expect(pressedKeys).toEqual(['ctrl', 's']);
     });
 
+    it('should detect and match a chord of two non-modifier keys', () => {
+      // Register a chord shortcut composed of two non-modifier keys: 'c' + 'a'
+      const chordAction = jasmine.createSpy('chordAction');
+      service.register({
+        id: 'chord-ca',
+        keys: ['c', 'a'],
+        macKeys: ['c', 'a'],
+        action: chordAction,
+        description: 'Chord C+A'
+      });
+
+      const testableService = service as any;
+
+      // Simulate keydown for 'c'
+      const eventC = new KeyboardEvent('keydown', { key: 'c' });
+      testableService.testHandleKeydown(eventC);
+
+      // Simulate keydown for 'a' while 'c' is still down
+      const eventA = new KeyboardEvent('keydown', { key: 'a' });
+      testableService.testHandleKeydown(eventA);
+
+      // The chord action should have been executed when the second key was pressed
+      expect(chordAction).toHaveBeenCalled();
+    });
+
+    it('should not falsely match chord when only one key is pressed', () => {
+      const chordAction = jasmine.createSpy('chordAction2');
+      service.register({
+        id: 'chord-xy',
+        keys: ['x', 'y'],
+        macKeys: ['x', 'y'],
+        action: chordAction,
+        description: 'Chord X+Y'
+      });
+
+      const testableService = service as any;
+      const eventX = new KeyboardEvent('keydown', { key: 'x' });
+      testableService.testHandleKeydown(eventX);
+
+      // Only one key down - should not trigger
+      expect(chordAction).not.toHaveBeenCalled();
+    });
+
     it('should parse multiple modifier keys', () => {
       const event = new KeyboardEvent('keydown', {
         ctrlKey: true,

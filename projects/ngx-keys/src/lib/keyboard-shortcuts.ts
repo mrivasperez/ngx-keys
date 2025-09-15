@@ -54,8 +54,13 @@ export class KeyboardShortcuts implements OnDestroy {
   });
   
   private readonly keydownListener = this.handleKeydown.bind(this);
+  private readonly keyupListener = this.handleKeyup.bind(this);
   private isListening = false;
   protected isBrowser: boolean;
+  // Track currently physically pressed keys (lowercased). This lets us detect chords
+  // formed by multiple non-modifier keys (e.g., ['c', 'a']). It is populated by
+  // keydown/keyup listeners and used by handleKeydown to build the pressed key set.
+  private readonly currentlyDownKeys = new Set<string>();
 
   constructor() {
     // Use try-catch to handle injection context for better testability
@@ -377,7 +382,11 @@ export class KeyboardShortcuts implements OnDestroy {
       return;
     }
     
+    // Listen to both keydown and keyup so we can maintain a Set of currently
+    // pressed physical keys. We avoid passive:true because we may call
+    // preventDefault() when matching shortcuts.
     document.addEventListener('keydown', this.keydownListener, { passive: false });
+    document.addEventListener('keyup', this.keyupListener, { passive: false });
     this.isListening = true;
   }
 
@@ -387,11 +396,18 @@ export class KeyboardShortcuts implements OnDestroy {
     }
     
     document.removeEventListener('keydown', this.keydownListener);
+    document.removeEventListener('keyup', this.keyupListener);
     this.isListening = false;
   }
 
   protected handleKeydown(event: KeyboardEvent): void {
-    const pressedKeys = this.getPressedKeys(event);
+    // Update the currently down keys with this event's key
+    this.updateCurrentlyDownKeysOnKeydown(event);
+
+    // Build the pressed keys set used for matching. Prefer the currentlyDownKeys
+    // if it contains more than one non-modifier key; otherwise fall back to the
+    // traditional per-event pressed keys calculation for compatibility.
+    const pressedKeys = this.buildPressedKeysForMatch(event);
     const isMac = this.isMacPlatform();
     
     for (const shortcutId of this.activeShortcuts) {
@@ -413,6 +429,83 @@ export class KeyboardShortcuts implements OnDestroy {
         break; // Only execute the first matching shortcut
       }
     }
+  }
+
+  protected handleKeyup(event: KeyboardEvent): void {
+    // Remove the key from currentlyDownKeys on keyup
+    const key = event.key ? event.key.toLowerCase() : '';
+    if (key && !['control', 'alt', 'shift', 'meta'].includes(key)) {
+      this.currentlyDownKeys.delete(key);
+    }
+  }
+
+  /**
+   * Update the currentlyDownKeys set when keydown events happen.
+   * Normalizes common keys (function keys, space, etc.) to the same values
+   * used by getPressedKeys/keysMatch.
+   */
+  protected updateCurrentlyDownKeysOnKeydown(event: KeyboardEvent): void {
+    const key = event.key ? event.key.toLowerCase() : '';
+
+    // Ignore modifier-only keydown entries
+    if (['control', 'alt', 'shift', 'meta'].includes(key)) {
+      return;
+    }
+
+    // Normalize some special cases similar to the demo component's recording logic
+    if (event.code && event.code.startsWith('F') && /^F\d+$/.test(event.code)) {
+      this.currentlyDownKeys.add(event.code.toLowerCase());
+      return;
+    }
+
+    if (key === ' ') {
+      this.currentlyDownKeys.add('space');
+      return;
+    }
+
+    if (key === 'escape') {
+      this.currentlyDownKeys.add('escape');
+      return;
+    }
+
+    if (key === 'enter') {
+      this.currentlyDownKeys.add('enter');
+      return;
+    }
+
+    if (key && key.length > 0) {
+      this.currentlyDownKeys.add(key);
+    }
+  }
+
+  /**
+   * Build the pressed keys array used for matching against registered shortcuts.
+   * If multiple non-modifier keys are currently down, include them (chord support).
+   * Otherwise fall back to single main-key detection from the event for compatibility.
+   */
+  protected buildPressedKeysForMatch(event: KeyboardEvent): string[] {
+    const modifiers: string[] = [];
+    if (event.ctrlKey) modifiers.push('ctrl');
+    if (event.altKey) modifiers.push('alt');
+    if (event.shiftKey) modifiers.push('shift');
+    if (event.metaKey) modifiers.push('meta');
+
+    // Collect non-modifier keys from currentlyDownKeys (excluding modifiers)
+    const nonModifierKeys = Array.from(this.currentlyDownKeys).filter(k => !['control', 'alt', 'shift', 'meta'].includes(k));
+
+    // If we have at least one non-modifier in the global set, use that set
+    // combined with current modifiers. This enables multi-non-modifier chords.
+    if (nonModifierKeys.length > 0) {
+      return [...modifiers, ...nonModifierKeys.map(k => k.toLowerCase())];
+    }
+
+    // Fallback: single main key from the event (existing behavior)
+    const key = event.key.toLowerCase();
+    const keys: string[] = [...modifiers];
+    if (!['control', 'alt', 'shift', 'meta'].includes(key)) {
+      keys.push(key);
+    }
+    return keys;
   }
 
   protected getPressedKeys(event: KeyboardEvent): string[] {
