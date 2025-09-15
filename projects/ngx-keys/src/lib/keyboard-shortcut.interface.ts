@@ -7,7 +7,7 @@ export interface KeyboardShortcut {
   macKeys: string[];
   action: () => void;
   description: string;
-  until?: Observable<any> | DestroyRef | 'destruct'
+  activeUntil?: Observable<unknown> | DestroyRef | 'destruct'
 }
 
 export interface KeyboardShortcutGroup {
