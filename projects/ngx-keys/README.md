@@ -132,6 +132,25 @@ this.keyboardService.deactivate('save');
 this.keyboardService.activate('save');
 ```
 
+### Chords (multiple non-modifier keys)
+
+- ngx-keys supports chords composed of multiple non-modifier keys pressed simultaneously (for example `C + A`).
+- When multiple non-modifier keys are physically held down at the same time, the service uses the set of currently pressed keys plus any modifier flags to match registered shortcuts.
+- Example: register a chord with `keys: ['c','a']` and pressing and holding `c` then pressing `a` will trigger the shortcut.
+- Note: Browsers deliver separate keydown events for each physical key; the library maintains a Set of currently-down keys via `keydown`/`keyup` listeners to enable chords. This approach attempts to be robust but can be affected by browser focus changes — ensure tests in your target browsers.
+
+Example registration:
+
+```typescript
+this.keyboardService.register({
+  id: 'chord-ca',
+  keys: ['c', 'a'],
+  macKeys: ['c', 'a'],
+  action: () => console.log('Chord C+A executed'),
+  description: 'Demo chord'
+});
+```
+
 ## API Reference
 
 ### KeyboardShortcuts Service
