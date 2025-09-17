@@ -1,11 +1,24 @@
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { KeyboardShortcut } from './keyboard-shortcut.interface';
 import { KeyboardShortcutsErrors } from './keyboard-shortcuts.errors';
+import * as ngCore from '@angular/core';
+import { of } from 'rxjs';
+import { 
+  TestableKeyboardShortcuts,
+  createMockShortcut,
+  createMockShortcuts,
+  createKeyboardEvent,
+  KeyboardEvents,
+  TestKeyboardShortcutsWithFakeDestruct,
+  TestObservables,
+  NonBrowserKeyboardShortcuts
+} from './test-utils';
 
 describe('KeyboardShortcuts', () => {
-  let service: KeyboardShortcuts;
+  let service: TestableKeyboardShortcuts;
   let mockAction: jasmine.Spy;
 
+  // Keep the original mockShortcut for backwards compatibility during refactoring
   const mockShortcut: KeyboardShortcut = {
     id: 'test-shortcut',
     keys: ['ctrl', 's'],
@@ -15,25 +28,8 @@ describe('KeyboardShortcuts', () => {
   };
 
   beforeEach(() => {
-    mockAction = jasmine.createSpy('mockAction');
-
-    // Create a testable instance by extending the service
-    class TestableKeyboardShortcuts extends KeyboardShortcuts {
-      constructor() {
-        super();
-        // Override platform detection for testing
-        (this as any).isBrowser = true;
-        (this as any).isListening = false;
-      }
-
-      // Make protected methods public for testing
-      public testHandleKeydown = this.handleKeydown.bind(this);
-      public testGetPressedKeys = (event: KeyboardEvent) => this.getPressedKeys(event);
-      public testKeysMatch = (pressed: string[], target: string[]) => this.keysMatch(pressed, target);
-      public testIsMacPlatform = () => this.isMacPlatform();
-    }
-
     service = new TestableKeyboardShortcuts();
+    mockAction = jasmine.createSpy('mockAction');
   });
 
   afterEach(() => {
@@ -104,7 +100,7 @@ describe('KeyboardShortcuts', () => {
 
   describe('Single Shortcut Management', () => {
     it('should register a single shortcut', () => {
-      const shortcut = { ...mockShortcut, action: mockAction };
+      const shortcut = createMockShortcut({ action: mockAction });
       service.register(shortcut);
 
       expect(service.getShortcuts().has('test-shortcut')).toBe(true);
@@ -112,7 +108,7 @@ describe('KeyboardShortcuts', () => {
     });
 
     it('should unregister a single shortcut', () => {
-      const shortcut = { ...mockShortcut, action: mockAction };
+      const shortcut = createMockShortcut({ action: mockAction });
       service.register(shortcut);
       service.unregister('test-shortcut');
 
@@ -121,7 +117,7 @@ describe('KeyboardShortcuts', () => {
     });
 
     it('should activate and deactivate individual shortcuts', () => {
-      const shortcut = { ...mockShortcut, action: mockAction };
+      const shortcut = createMockShortcut({ action: mockAction });
       service.register(shortcut);
 
       service.deactivate('test-shortcut');
@@ -142,14 +138,115 @@ describe('KeyboardShortcuts', () => {
         KeyboardShortcutsErrors.CANNOT_DEACTIVATE_SHORTCUT('non-existent')
       );
     });
+
+    describe('activeUntil cleanup', () => {
+      it('should handle undefined activeUntil gracefully', () => {
+        const mockAction = jasmine.createSpy('mockAction');
+        
+        const shortcut: KeyboardShortcut = {
+          id: 'no-activeuntil-test',
+          keys: ['f3'],
+          macKeys: ['f3'],
+          action: mockAction,
+          description: 'Test no activeUntil',
+          activeUntil: undefined
+        };
+
+        expect(() => service.register(shortcut)).not.toThrow();
+        expect(service.isRegistered('no-activeuntil-test')).toBe(true);
+      });
+
+      it('should unregister when activeUntil is "destruct" by using an overridden setupActiveUntil', () => {
+        const mockAction = jasmine.createSpy('mockAction');
+        const localService = new TestKeyboardShortcutsWithFakeDestruct();
+
+        const shortcut = createMockShortcut({
+          id: 'destruct-test',
+          keys: ['f4'],
+          macKeys: ['f4'],
+          action: mockAction,
+          description: 'Test destruct',
+          activeUntil: 'destruct'
+        });
+
+        localService.register(shortcut);
+        expect(localService.isRegistered('destruct-test')).toBe(true);
+
+        // Trigger destruction using the utility's fake DestroyRef
+        localService.fakeDestroyRef.trigger();
+        expect(localService.isRegistered('destruct-test')).toBe(false);
+      });
+
+      it('should unregister when activeUntil is a DestroyRef instance', () => {
+        const mockAction = jasmine.createSpy('mockAction');
+
+        // Try to extend the real DestroyRef if available, otherwise fallback to a compatible fake
+        const RealDestroyRef: any = (ngCore as any).DestroyRef || null;
+
+        let instance: any;
+        if (RealDestroyRef) {
+          class LocalFake extends RealDestroyRef {
+            private cb: (() => void) | null = null;
+            onDestroy(fn: () => void) { this.cb = fn; }
+            trigger() { if (this.cb) this.cb(); }
+          }
+          instance = new LocalFake();
+        } else {
+          // Fallback: use a plain object that will still match the instanceof check in some environments
+          instance = {
+            cb: null as any,
+            onDestroy(fn: () => void) { this.cb = fn; },
+            trigger() { if (this.cb) this.cb(); }
+          };
+          // Try to set prototype to mimic DestroyRef if available
+          if ((ngCore as any).DestroyRef && (ngCore as any).DestroyRef.prototype) {
+            Object.setPrototypeOf(instance, (ngCore as any).DestroyRef.prototype);
+          }
+        }
+
+        const shortcut: KeyboardShortcut = {
+          id: 'destroyref-instance-test',
+          keys: ['f5'],
+          macKeys: ['f5'],
+          action: mockAction,
+          description: 'Test destroyref instance',
+          activeUntil: instance
+        } as any;
+
+        service.register(shortcut);
+        expect(service.isRegistered('destroyref-instance-test')).toBe(true);
+
+        // Trigger the stored callback
+        instance.trigger();
+        expect(service.isRegistered('destroyref-instance-test')).toBe(false);
+      });
+
+      it('should unregister when observable emits', () => {
+        const mockAction = jasmine.createSpy('mockAction');
+        const obs = TestObservables.immediateTrigger();
+
+        const shortcut = createMockShortcut({
+          id: 'observable-test',
+          keys: ['f6'],
+          macKeys: ['f6'],
+          action: mockAction,
+          description: 'Test observable',
+          activeUntil: obs
+        });
+
+        service.register(shortcut);
+        // Observable emits synchronously so the shortcut should have been unregistered
+        expect(service.isRegistered('observable-test')).toBe(false);
+      });
+    });
   });
 
   describe('Group Management', () => {
     it('should register a group of shortcuts', () => {
-      const shortcuts = [
-        { ...mockShortcut, id: 'shortcut-1', action: mockAction },
-        { ...mockShortcut, id: 'shortcut-2', keys: ['ctrl', 'c'], action: mockAction }
-      ];
+      const shortcuts = createMockShortcuts(2, { action: mockAction });
+      // Update the second shortcut to use different keys
+      shortcuts[1].keys = ['ctrl', 'c'];
+      shortcuts[1].macKeys = ['meta', 'c'];
 
       service.registerGroup('test-group', shortcuts);
 
@@ -160,10 +257,9 @@ describe('KeyboardShortcuts', () => {
     });
 
     it('should unregister a group of shortcuts', () => {
-      const shortcuts = [
-        { ...mockShortcut, id: 'shortcut-1', action: mockAction },
-        { ...mockShortcut, id: 'shortcut-2', keys: ['ctrl', 'c'], action: mockAction }
-      ];
+      const shortcuts = createMockShortcuts(2, { action: mockAction });
+      shortcuts[1].keys = ['ctrl', 'c'];
+      shortcuts[1].macKeys = ['meta', 'c'];
 
       service.registerGroup('test-group', shortcuts);
       service.unregisterGroup('test-group');
@@ -175,10 +271,9 @@ describe('KeyboardShortcuts', () => {
     });
 
     it('should activate and deactivate groups', () => {
-      const shortcuts = [
-        { ...mockShortcut, id: 'shortcut-1', action: mockAction },
-        { ...mockShortcut, id: 'shortcut-2', keys: ['ctrl', 'c'], action: mockAction }
-      ];
+      const shortcuts = createMockShortcuts(2, { action: mockAction });
+      shortcuts[1].keys = ['ctrl', 'c'];
+      shortcuts[1].macKeys = ['meta', 'c'];
 
       service.registerGroup('test-group', shortcuts);
 
@@ -209,6 +304,118 @@ describe('KeyboardShortcuts', () => {
       expect(() => service.unregisterGroup('non-existent')).toThrowError(
         KeyboardShortcutsErrors.CANNOT_UNREGISTER_GROUP('non-existent')
       );
+    });
+
+    describe('activeUntil cleanup', () => {
+      it('should handle undefined activeUntil gracefully for groups', () => {
+        const mockAction = jasmine.createSpy('mockAction');
+
+        const shortcuts = [
+          {
+            id: 'group-no-activeuntil-1',
+            keys: ['f7'],
+            macKeys: ['f7'],
+            action: mockAction,
+            description: 'Test'
+          }
+        ];
+
+        expect(() => service.registerGroup('group-no-activeuntil', shortcuts)).not.toThrow();
+        expect(service.isGroupRegistered('group-no-activeuntil')).toBe(true);
+      });
+
+      it('should unregister group when activeUntil is "destruct" by using an overridden setupActiveUntil', () => {
+        const mockAction = jasmine.createSpy('mockAction');
+
+        class DestructGroupService extends KeyboardShortcuts {
+          public fakeRef = { cb: null as (() => void) | null, onDestroy(fn: () => void) { this.cb = fn }, trigger() { if (this.cb) this.cb(); } };
+          constructor() { super(); (this as any).isBrowser = true; (this as any).isListening = false; }
+          protected override setupActiveUntil(activeUntil: any, unregister: () => void) {
+            if (activeUntil === 'destruct') {
+              this.fakeRef.onDestroy(unregister);
+              return;
+            }
+            return super.setupActiveUntil(activeUntil, unregister);
+          }
+        }
+
+        const localService = new DestructGroupService();
+
+        const shortcuts = [
+          {
+            id: 'group-destruct-1',
+            keys: ['f8'],
+            macKeys: ['f8'],
+            action: mockAction,
+            description: 'Test'
+          }
+        ];
+
+        localService.registerGroup('group-destruct', shortcuts, 'destruct' as any);
+        expect(localService.isGroupRegistered('group-destruct')).toBe(true);
+
+        localService.fakeRef.trigger();
+        expect(localService.isGroupRegistered('group-destruct')).toBe(false);
+      });
+
+      it('should unregister group when activeUntil is a DestroyRef instance', () => {
+        const mockAction = jasmine.createSpy('mockAction');
+
+        const RealDestroyRef: any = (ngCore as any).DestroyRef || null;
+        let instance: any;
+        if (RealDestroyRef) {
+          class LocalFake extends RealDestroyRef {
+            private cb: (() => void) | null = null;
+            onDestroy(fn: () => void) { this.cb = fn; }
+            trigger() { if (this.cb) this.cb(); }
+          }
+          instance = new LocalFake();
+        } else {
+          instance = {
+            cb: null as any,
+            onDestroy(fn: () => void) { this.cb = fn; },
+            trigger() { if (this.cb) this.cb(); }
+          };
+          if ((ngCore as any).DestroyRef && (ngCore as any).DestroyRef.prototype) {
+            Object.setPrototypeOf(instance, (ngCore as any).DestroyRef.prototype);
+          }
+        }
+
+        const shortcuts = [
+          {
+            id: 'group-dref-1',
+            keys: ['f9'],
+            macKeys: ['f9'],
+            action: mockAction,
+            description: 'Test'
+          }
+        ];
+
+        service.registerGroup('group-dref', shortcuts, instance);
+        expect(service.isGroupRegistered('group-dref')).toBe(true);
+
+        instance.trigger();
+        expect(service.isGroupRegistered('group-dref')).toBe(false);
+      });
+
+      it('should unregister group when observable emits', () => {
+        const mockAction = jasmine.createSpy('mockAction');
+        const obs = of(true);
+
+        const shortcuts = [
+          {
+            id: 'group-obs-1',
+            keys: ['f10'],
+            macKeys: ['f10'],
+            action: mockAction,
+            description: 'Test'
+          }
+        ];
+
+        service.registerGroup('group-obs', shortcuts, obs as any);
+        // of(true) emits synchronously so the group should have been unregistered
+        expect(service.isGroupRegistered('group-obs')).toBe(false);
+      });
     });
   });
 
@@ -434,41 +641,30 @@ describe('KeyboardShortcuts', () => {
 
   describe('Keyboard Event Handling', () => {
     it('should execute shortcut action when matching keys are pressed', () => {
-      const shortcut = { ...mockShortcut, action: mockAction };
+      const shortcut = createMockShortcut({ action: mockAction });
       service.register(shortcut);
 
-      const testableService = service as any;
-      const event = new KeyboardEvent('keydown', {
-        ctrlKey: true,
-        key: 's'
-      });
-
-      testableService.testHandleKeydown(event);
+      const event = KeyboardEvents.ctrlS();
+      service.testHandleKeydown(event);
       expect(mockAction).toHaveBeenCalled();
     });
 
     it('should use Mac keys on Mac platform', () => {
       const macAction = jasmine.createSpy('macAction');
-      const shortcut = {
-        ...mockShortcut,
+      const shortcut = createMockShortcut({
         keys: ['ctrl', 's'],
         macKeys: ['meta', 's'],
         action: macAction
-      };
+      });
       service.register(shortcut);
 
-      const testableService = service as any;
       // Mock both the platform detection AND isBrowser check
-      spyOn(testableService, 'testIsMacPlatform').and.returnValue(true);
+      spyOn(service, 'testIsMacPlatform').and.returnValue(true);
       // Override the isMacPlatform method call in handleKeydown
-      spyOn(testableService, 'isMacPlatform').and.returnValue(true);
+      spyOn(service as any, 'isMacPlatform').and.returnValue(true);
 
-      const event = new KeyboardEvent('keydown', {
-        metaKey: true,
-        key: 's'
-      });
-
-      testableService.testHandleKeydown(event);
+      const event = KeyboardEvents.metaS();
+      service.testHandleKeydown(event);
       expect(macAction).toHaveBeenCalled();
     });
 
@@ -547,13 +743,6 @@ describe('KeyboardShortcuts', () => {
 
   describe('Browser Environment Handling', () => {
     it('should handle non-browser environment gracefully', () => {
-      class NonBrowserKeyboardShortcuts extends KeyboardShortcuts {
-        constructor() {
-          super();
-          (this as any).isBrowser = false;
-        }
-      }
-
       expect(() => new NonBrowserKeyboardShortcuts()).not.toThrow();
     });
   });
