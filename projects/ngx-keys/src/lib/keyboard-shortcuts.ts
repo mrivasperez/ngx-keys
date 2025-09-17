@@ -1,4 +1,12 @@
-import { Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
+import {
+  Injectable,
+  OnDestroy,
+  PLATFORM_ID,
+  inject,
+  signal,
+  computed,
+  DOCUMENT,
+} from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { KeyboardShortcut, KeyboardShortcutGroup, KeyboardShortcutUI } from './keyboard-shortcut.interface';
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
@@ -7,6 +15,8 @@ import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
   providedIn: 'root'
 })
 export class KeyboardShortcuts implements OnDestroy {
+  private readonly document = inject(DOCUMENT);
+  private readonly window = this.document.defaultView;
   private readonly shortcuts = new Map<string, KeyboardShortcut>();
   private readonly groups = new Map<string, KeyboardShortcutGroup>();
   private readonly activeShortcuts = new Set<string>();
@@ -63,7 +73,7 @@ export class KeyboardShortcuts implements OnDestroy {
       const platformId = inject(PLATFORM_ID);
       this.isBrowser = isPlatformBrowser(platformId);
     } catch {
-      // Fallback for testing - assume browser environment
+      // Fallback for testing, use `window` & `document` directly - assume browser environment
       this.isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
     }
 
@@ -377,7 +387,7 @@ export class KeyboardShortcuts implements OnDestroy {
       return;
     }
     
-    document.addEventListener('keydown', this.keydownListener, { passive: false });
+    this.document.addEventListener('keydown', this.keydownListener, { passive: false });
     this.isListening = true;
   }
 
@@ -386,7 +396,7 @@ export class KeyboardShortcuts implements OnDestroy {
       return;
     }
     
-    document.removeEventListener('keydown', this.keydownListener);
+    this.document.removeEventListener('keydown', this.keydownListener);
     this.isListening = false;
   }
 
@@ -445,6 +455,6 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   protected isMacPlatform(): boolean {
-    return this.isBrowser && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+    return this.isBrowser && /Mac|iPod|iPhone|iPad/.test(this.window?.navigator.platform ?? '');
   }
 }
