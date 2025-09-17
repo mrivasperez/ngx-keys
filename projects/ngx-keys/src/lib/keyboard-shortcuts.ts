@@ -60,6 +60,15 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly visibilityListener = this.handleVisibilityChange.bind(this);
   private isListening = false;
   protected isBrowser: boolean;
+  /** Default timeout (ms) for completing a multi-step sequence */
+  protected sequenceTimeout = 2000;
+
+  /** Runtime state for multi-step sequences */
+  private pendingSequence: {
+    shortcutId: string;
+    stepIndex: number;
+    timerId: any;
+  } | null = null;
 
   constructor() {
     // Use try-catch to handle injection context for better testability
