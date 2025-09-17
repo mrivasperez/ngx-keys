@@ -573,11 +573,18 @@ export class KeyboardShortcuts implements OnDestroy {
 
   protected handleWindowBlur(): void {
     this.clearCurrentlyDownKeys();
+    // Clear any pressed keys and any pending multi-step sequence to avoid
+    // stale state when the window loses focus.
+    this.clearPendingSequence();
   }
 
   protected handleVisibilityChange(): void {
     if (document.visibilityState === 'hidden') {
+      // When the document becomes hidden, clear both pressed keys and any
+      // pending multi-step sequence. This prevents sequences from remaining
+      // active when the user switches tabs or minimizes the window.
       this.clearCurrentlyDownKeys();
+      this.clearPendingSequence();
     }
   }
 
