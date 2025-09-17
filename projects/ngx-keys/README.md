@@ -122,6 +122,29 @@ this.keyboardService.register({
 });
 ```
 
+### Multi-step (sequence) shortcuts
+
+In addition to single-step shortcuts using `keys` / `macKeys`, ngx-keys supports ordered multi-step sequences using `steps` and `macSteps` on the `KeyboardShortcut` object. Each element in `steps` is itself an array of key tokens that must be pressed together for that step.
+
+Example: register a sequence that requires `Ctrl+K` followed by `S`:
+
+```typescript
+this.keyboardService.register({
+  id: 'open-settings-seq',
+  steps: [['ctrl', 'k'], ['s']],
+  macSteps: [['meta', 'k'], ['s']],
+  action: () => this.openSettings(),
+  description: 'Open settings (Ctrl+K then S)'
+});
+```
+
+Important behavior notes:
+
+- Default sequence timeout: the service requires the next step to be entered within 2000ms (2 seconds) of the previous step; otherwise the pending sequence is cleared. This timeout is intentionally conservative and can be changed in future releases or exposed per-shortcut if needed.
+- Steps are order-sensitive. `steps: [['ctrl','k'], ['s']]` is different from `steps: [['s'], ['ctrl','k']]`.
+- Existing single-step `keys` / `macKeys` remain supported and continue to work as before.
+
+
 Use the `activate()` and `deactivate()` methods for dynamic control after registration:
 
 ```typescript
@@ -201,8 +224,14 @@ interface KeyboardShortcutUI {
 ```typescript
 interface KeyboardShortcut {
   id: string;           // Unique identifier
-  keys: string[];       // Key combination for PC/Linux (e.g., ['ctrl', 's'])
-  macKeys: string[];    // Key combination for Mac (e.g., ['meta', 's'])
+  // Single-step combinations (existing API)
+  keys?: string[];       // Key combination for PC/Linux (e.g., ['ctrl', 's'])
+  macKeys?: string[];    // Key combination for Mac (e.g., ['meta', 's'])
+
+  // Multi-step sequences (new)
+  // Each step is an array of keys pressed together. Example: steps: [['ctrl','k'], ['s']]
+  steps?: string[][];
+  macSteps?: string[][];
   action: () => void;   // Function to execute
   description: string;  // Human-readable description
 }
@@ -356,6 +385,62 @@ export class FeatureComponent {
 }
 ```
 
+### Automatic unregistering
+
+`register` and `registerGroup` have the optional parameter: `activeUntil`. 
+The `activeUntil` parameter allows you to connect the shortcut to the wrappers lifecycle or logic in general.  
+
+`activeUntil` supports three types:
+- `'destruct'`: the shortcut injects the parents `DestroyRef` and unregisters once the component destructs
+- `DestroyRef`: DestroyRef which should trigger the destruction of the shortcut
+- `Observable<unknown>`: an Observable which will unregister the shortcut when triggered
+
+#### Example: `'destruct'`
+Shortcuts defined by this component will only be listening during the lifecycle of the component.
+Shortcuts are registered on construction and are automatically unregistered on destruction.
+
+```typescript
+export class Component {
+  constructor() {
+    const keyboardService = inject(KeyboardShortcuts)
+
+    keyboardService.register({
+      // ...
+      activeUntil: 'destruct', // alternatively: inject(DestroyRef)
+    });
+
+    keyboardService.registerGroup(
+      'shortcuts',
+      [/* ... */],
+      'destruct', // alternatively: inject(DestroyRef)
+    );
+  }
+}
+```
+
+#### Example: `Observable`
+
+```typescript
+const shortcutTTL = new Subject<void>();
+
+keyboardService.register({
+  // ...
+  activeUntil: shortcutTTL,
+});
+
+keyboardService.registerGroup(
+  'shortcuts',
+  [/* ... */], 
+  shortcutTTL,
+);
+
+// Shortcuts are listening...
+
+shortcutTTL.next();
+
+// Shortcuts are unregistered
+```
+
 ### Batch Operations
 
 For better performance when making multiple changes, use the `batchUpdate` method.
@@ -421,6 +506,25 @@ export class MyComponent {
     }
   }
 }
+```
+
+### Chords (multiple non-modifier keys)
+
+- ngx-keys supports chords composed of multiple non-modifier keys pressed simultaneously (for example `C + A`).
+- When multiple non-modifier keys are physically held down at the same time, the service uses the set of currently pressed keys plus any modifier flags to match registered shortcuts.
+- Example: register a chord with `keys: ['c','a']` and pressing and holding `c` then pressing `a` will trigger the shortcut.
+- Note: Browsers deliver separate keydown events for each physical key; the library maintains a Set of currently-down keys via `keydown`/`keyup` listeners to enable chords. This approach attempts to be robust but can be affected by browser focus changes — ensure tests in your target browsers.
+
+Example registration:
+
+```typescript
+this.keyboardService.register({
+  id: 'chord-ca',
+  keys: ['c', 'a'],
+  macKeys: ['c', 'a'],
+  action: () => console.log('Chord C+A executed'),
+  description: 'Demo chord'
+});
 ```
 
 ## Building
