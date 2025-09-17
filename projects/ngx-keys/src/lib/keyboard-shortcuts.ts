@@ -1,7 +1,8 @@
-import { Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
+import { DestroyRef, Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { KeyboardShortcut, KeyboardShortcutGroup, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface';
+import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutGroup, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
+import { Observable, take } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -203,13 +204,18 @@ export class KeyboardShortcuts implements OnDestroy {
     this.shortcuts.set(shortcut.id, shortcut);
     this.activeShortcuts.add(shortcut.id);
     this.updateState();
+
+    this.setupActiveUntil(
+      shortcut.activeUntil,
+      this.unregister.bind(this, shortcut.id),
+    );
   }
 
   /**
    * Register multiple keyboard shortcuts as a group
    * @throws KeyboardShortcutError if group ID is already registered or if any shortcut ID or key combination conflicts
    */
-  registerGroup(groupId: string, shortcuts: KeyboardShortcut[]): void {
+  registerGroup(groupId: string, shortcuts: KeyboardShortcut[], activeUntil?: KeyboardShortcutActiveUntil): void {
     // Check if group ID already exists
     if (this.groups.has(groupId)) {
       throw KeyboardShortcutsErrorFactory.groupAlreadyRegistered(groupId);
@@ -268,6 +274,11 @@ export class KeyboardShortcuts implements OnDestroy {
         this.activeShortcuts.add(shortcut.id);
       });
     });
+
+    this.setupActiveUntil(
+      activeUntil,
+      this.unregisterGroup.bind(this, groupId),
+    );
   }
 
   /**
@@ -563,5 +574,26 @@ export class KeyboardShortcuts implements OnDestroy {
 
   protected isMacPlatform(): boolean {
     return this.isBrowser && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+  }
+  
+  protected setupActiveUntil (activeUntil: KeyboardShortcutActiveUntil|undefined, unregister: () => void) {
+    if (!activeUntil) {
+      return
+    }
+
+    if (activeUntil === 'destruct') {
+      inject(DestroyRef).onDestroy(unregister);
+      return
+    } 
+    
+    if (activeUntil instanceof DestroyRef) {
+      activeUntil.onDestroy(unregister);
+      return
+    } 
+    
+    if (activeUntil instanceof Observable) {
+      activeUntil.pipe(take(1)).subscribe(unregister);
+      return
+    }
   }
 }

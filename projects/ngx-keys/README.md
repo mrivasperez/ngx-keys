@@ -385,6 +385,62 @@ export class FeatureComponent {
 }
 ```
 
+### Automatic unregistering
+
+`register` and `registerGroup` have the optional parameter: `activeUntil`. 
+The `activeUntil` parameter allows you to connect the shortcut to the wrappers lifecycle or logic in general.  
+
+`activeUntil` supports three types:
+- `'destruct'`: the shortcut injects the parents `DestroyRef` and unregisters once the component destructs
+- `DestroyRef`: DestroyRef which should trigger the destruction of the shortcut
+- `Observable<unknown>`: an Observable which will unregister the shortcut when triggered
+
+#### Example: `'destruct'`
+Shortcuts defined by this component will only be listening during the lifecycle of the component.
+Shortcuts are registered on construction and are automatically unregistered on destruction.
+
+```typescript
+export class Component {
+  constructor() {
+    const keyboardService = inject(KeyboardShortcuts)
+
+    keyboardService.register({
+      // ...
+      activeUntil: 'destruct', // alternatively: inject(DestroyRef)
+    });
+
+    keyboardService.registerGroup(
+      'shortcuts',
+      [/* ... */],
+      'destruct', // alternatively: inject(DestroyRef)
+    );
+  }
+}
+```
+
+#### Example: `Observable`
+
+```typescript
+const shortcutTTL = new Subject<void>();
+
+keyboardService.register({
+  // ...
+  activeUntil: shortcutTTL,
+});
+
+keyboardService.registerGroup(
+  'shortcuts',
+  [/* ... */], 
+  shortcutTTL,
+);
+
+// Shortcuts are listening...
+
+shortcutTTL.next();
+
+// Shortcuts are unregistered
+```
+
 ### Batch Operations
 
 For better performance when making multiple changes, use the `batchUpdate` method.
