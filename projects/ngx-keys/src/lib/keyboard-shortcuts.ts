@@ -12,6 +12,7 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly groups = new Map<string, KeyboardShortcutGroup>();
   private readonly activeShortcuts = new Set<string>();
   private readonly activeGroups = new Set<string>();
+  private readonly currentlyDownKeys = new Set<string>();
   
   // Single consolidated state signal - reduces memory overhead
   private readonly state = signal({
@@ -475,7 +476,15 @@ export class KeyboardShortcuts implements OnDestroy {
         const normalizedSteps = this.normalizeToSteps(steps as KeyStep[] | string[]);
         const expected = normalizedSteps[pending.stepIndex];
 
-        if (expected && this.keysMatch(pressedKeys, expected)) {
+        // Use per-event pressed keys for advancing sequence steps. Relying on
+        // the accumulated `currentlyDownKeys` can accidentally include keys
+        // from previous steps (if tests or callers don't emit keyup), which
+        // would prevent matching a simple single-key step like ['s'] after
+        // a prior ['k'] step. Use getPressedKeys(event) which reflects the
+        // actual modifier/main-key state for this event.
+        const stepPressed = this.getPressedKeys(event);
+
+        if (expected && this.keysMatch(stepPressed, expected)) {
           // Advance sequence
           clearTimeout(pending.timerId);
           pending.stepIndex += 1;
@@ -686,11 +695,14 @@ export class KeyboardShortcuts implements OnDestroy {
       return false;
     }
     
-    // Normalize and sort both arrays for comparison
-    const normalizedPressed = pressedKeys.map(key => key.toLowerCase()).sort();
-    const normalizedTarget = targetKeys.map(key => key.toLowerCase()).sort();
+    // Check if every element in normalizedTarget exists in pressedSet
+    for (const key of normalizedTarget) {
+      if (!pressedSet.has(key)) {
+        return false;
+      }
+    }
     
-    return normalizedPressed.every((key, index) => key === normalizedTarget[index]);
+    return true;
   }
 
   /** Compare two multi-step sequences for equality */
