@@ -47,6 +47,13 @@ export class CustomizeComponent {
             macKeys: ['meta', 'k']
         },
         {
+            id: 'chord-ca',
+            name: 'Chord C+A',
+            description: 'Demo chord: press C and A together',
+            keys: ['c', 'a'],
+            macKeys: ['c', 'a']
+        },
+        {
             id: 'refresh-data',
             name: 'Refresh Data',
             description: 'Refresh the current page data',

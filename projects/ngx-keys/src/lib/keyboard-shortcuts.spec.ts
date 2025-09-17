@@ -486,51 +486,193 @@ describe('KeyboardShortcuts', () => {
   });
 
   describe('Key Matching Logic', () => {
-    let testableService: any;
-
-    beforeEach(() => {
-      testableService = service as any;
-    });
 
     it('should correctly parse pressed keys from keyboard event', () => {
-      const event = new KeyboardEvent('keydown', {
-        ctrlKey: true,
-        key: 's'
-      });
+      const event = KeyboardEvents.ctrlS();
 
-      const pressedKeys = testableService.testGetPressedKeys(event);
+      const pressedKeys = service.testGetPressedKeys(event);
       expect(pressedKeys).toEqual(['ctrl', 's']);
     });
 
-    it('should parse multiple modifier keys', () => {
-      const event = new KeyboardEvent('keydown', {
-        ctrlKey: true,
-        altKey: true,
-        shiftKey: true,
-        metaKey: true,
-        key: 'a'
-      });
+    it('should detect and match a chord of two non-modifier keys', () => {
+      // Register a chord shortcut using our utility
+      const chordAction = jasmine.createSpy('chordAction');
+      service.register(createMockShortcut({
+        id: 'chord-ca',
+        keys: ['c', 'a'],
+        macKeys: ['c', 'a'],
+        action: chordAction,
+        description: 'Chord C+A'
+      }));
 
-      const pressedKeys = testableService.testGetPressedKeys(event);
+      // Simulate keydown for 'c' using our utility
+      const eventC = createKeyboardEvent({ key: 'c' });
+      service.testHandleKeydown(eventC);
+
+      // Simulate keydown for 'a' while 'c' is still down
+      const eventA = createKeyboardEvent({ key: 'a' });
+      service.testHandleKeydown(eventA);
+
+      // The chord action should have been executed when the second key was pressed
+      expect(chordAction).toHaveBeenCalled();
+    });
+
+    it('should not falsely match chord when only one key is pressed', () => {
+      const chordAction = jasmine.createSpy('chordAction2');
+      service.register(createMockShortcut({
+        id: 'chord-xy',
+        keys: ['x', 'y'],
+        macKeys: ['x', 'y'],
+        action: chordAction,
+        description: 'Chord X+Y'
+      }));
+
+      const eventX = createKeyboardEvent({ key: 'x' });
+      service.testHandleKeydown(eventX);
+
+      // Only one key down - should not trigger
+      expect(chordAction).not.toHaveBeenCalled();
+    });
+
+    it('should clear currently-down keys and prevent stale chord matches', () => {
+      const chordAction = jasmine.createSpy('chordActionClear');
+      service.register(createMockShortcut({
+        id: 'chord-clear',
+        keys: ['m', 'n'],
+        macKeys: ['m', 'n'],
+        action: chordAction,
+        description: 'Chord M+N'
+      }));
+
+      // Simulate m down using our utility
+      const eventM = createKeyboardEvent({ key: 'm' });
+      service.testHandleKeydown(eventM);
+
+      // Now simulate window blur/visibility change by calling the clear method
+      service.clearCurrentlyDownKeys();
+
+      // Simulate n down — chord should not trigger because the state was cleared
+      const eventN = createKeyboardEvent({ key: 'n' });
+      service.testHandleKeydown(eventN);
+
+      expect(chordAction).not.toHaveBeenCalled();
+    });
+
+    it('should handle chord with three non-modifier keys', () => {
+      const chordAction = jasmine.createSpy('tripleChordAction');
+      service.register(createMockShortcut({
+        id: 'chord-abc',
+        keys: ['a', 'b', 'c'],
+        macKeys: ['a', 'b', 'c'],
+        action: chordAction,
+        description: 'Chord A+B+C'
+      }));
+
+      // Press all three keys in sequence
+      service.testHandleKeydown(createKeyboardEvent({ key: 'a' }));
+      service.testHandleKeydown(createKeyboardEvent({ key: 'b' }));
+      service.testHandleKeydown(createKeyboardEvent({ key: 'c' }));
+
+      expect(chordAction).toHaveBeenCalled();
+    });
+
+    it('should handle chord with modifiers and non-modifier keys combined', () => {
+      const chordAction = jasmine.createSpy('modifierChordAction');
+      service.register(createMockShortcut({
+        id: 'chord-ctrl-ab',
+        keys: ['ctrl', 'a', 'b'],
+        macKeys: ['meta', 'a', 'b'],
+        action: chordAction,
+        description: 'Chord Ctrl+A+B'
+      }));
+
+      // Press ctrl, then a, then b
+      service.testHandleKeydown(createKeyboardEvent({ key: 'a', ctrlKey: true }));
+      service.testHandleKeydown(createKeyboardEvent({ key: 'b', ctrlKey: true }));
+
+      expect(chordAction).toHaveBeenCalled();
+    });
+
+    it('should not trigger chord when keys are pressed in wrong combination', () => {
+      const chordAction = jasmine.createSpy('wrongOrderAction');
+      service.register(createMockShortcut({
+        id: 'chord-precise',
+        keys: ['p', 'q'],
+        macKeys: ['p', 'q'],
+        action: chordAction,
+        description: 'Chord P+Q'
+      }));
+
+      // Press only p, then release without pressing q
+      service.testHandleKeydown(createKeyboardEvent({ key: 'p' }));
+      // Simulate some other key being pressed instead
+      service.testHandleKeydown(createKeyboardEvent({ key: 'r' }));
+
+      expect(chordAction).not.toHaveBeenCalled();
+    });
+
+    it('should handle multiple different chords without interference', () => {
+      const chordAction1 = jasmine.createSpy('chord1Action');
+      const chordAction2 = jasmine.createSpy('chord2Action');
+      
+      service.register(createMockShortcut({
+        id: 'chord-first',
+        keys: ['j', 'k'],
+        macKeys: ['j', 'k'],
+        action: chordAction1,
+        description: 'Chord J+K'
+      }));
+
+      service.register(createMockShortcut({
+        id: 'chord-second',
+        keys: ['l', 'm'],
+        macKeys: ['l', 'm'],
+        action: chordAction2,
+        description: 'Chord L+M'
+      }));
+
+      // Trigger first chord
+      service.testHandleKeydown(createKeyboardEvent({ key: 'j' }));
+      service.testHandleKeydown(createKeyboardEvent({ key: 'k' }));
+
+      expect(chordAction1).toHaveBeenCalled();
+      expect(chordAction2).not.toHaveBeenCalled();
+
+      // Clear currently pressed keys to ensure clean state for second chord
+      service.clearCurrentlyDownKeys();
+      
+      // Reset spy calls and trigger second chord
+      chordAction1.calls.reset();
+      chordAction2.calls.reset();
+
+      service.testHandleKeydown(createKeyboardEvent({ key: 'l' }));
+      service.testHandleKeydown(createKeyboardEvent({ key: 'm' }));
+
+      expect(chordAction1).not.toHaveBeenCalled();
+      expect(chordAction2).toHaveBeenCalled();
+    });
+
+    it('should parse multiple modifier keys', () => {
+      const event = KeyboardEvents.allModifiers('a');
+
+      const pressedKeys = service.testGetPressedKeys(event);
       expect(pressedKeys).toEqual(['ctrl', 'alt', 'shift', 'meta', 'a']);
     });
 
     it('should ignore modifier keys as main key', () => {
-      const event = new KeyboardEvent('keydown', {
+      const event = createKeyboardEvent({
         ctrlKey: true,
         key: 'control'
       });
 
-      const pressedKeys = testableService.testGetPressedKeys(event);
+      const pressedKeys = service.testGetPressedKeys(event);
       expect(pressedKeys).toEqual(['ctrl']);
     });
 
     it('should handle special keys', () => {
-      const event = new KeyboardEvent('keydown', {
-        key: 'Enter'
-      });
+      const event = KeyboardEvents.enter();
 
-      const pressedKeys = testableService.testGetPressedKeys(event);
+      const pressedKeys = service.testGetPressedKeys(event);
       expect(pressedKeys).toEqual(['enter']);
     });
 
@@ -538,35 +680,35 @@ describe('KeyboardShortcuts', () => {
       const pressedKeys = ['ctrl', 's'];
       const targetKeys = ['ctrl', 's'];
 
-      expect(testableService.testKeysMatch(pressedKeys, targetKeys)).toBe(true);
+      expect(service.testKeysMatch(pressedKeys, targetKeys)).toBe(true);
     });
 
     it('should not match different key combinations', () => {
       const pressedKeys = ['ctrl', 's'];
       const targetKeys = ['ctrl', 'c'];
 
-      expect(testableService.testKeysMatch(pressedKeys, targetKeys)).toBe(false);
+      expect(service.testKeysMatch(pressedKeys, targetKeys)).toBe(false);
     });
 
     it('should not match different lengths', () => {
       const pressedKeys = ['ctrl', 's'];
       const targetKeys = ['ctrl', 'shift', 's'];
 
-      expect(testableService.testKeysMatch(pressedKeys, targetKeys)).toBe(false);
+      expect(service.testKeysMatch(pressedKeys, targetKeys)).toBe(false);
     });
 
     it('should handle case insensitive key matching', () => {
       const pressedKeys = ['ctrl', 'S'];
       const targetKeys = ['ctrl', 's'];
 
-      expect(testableService.testKeysMatch(pressedKeys, targetKeys)).toBe(true);
+      expect(service.testKeysMatch(pressedKeys, targetKeys)).toBe(true);
     });
 
     it('should match keys regardless of order', () => {
       const pressedKeys = ['s', 'ctrl'];
       const targetKeys = ['ctrl', 's'];
 
-      expect(testableService.testKeysMatch(pressedKeys, targetKeys)).toBe(true);
+      expect(service.testKeysMatch(pressedKeys, targetKeys)).toBe(true);
     });
   });
 

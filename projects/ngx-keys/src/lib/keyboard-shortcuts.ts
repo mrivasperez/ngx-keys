@@ -55,8 +55,15 @@ export class KeyboardShortcuts implements OnDestroy {
   });
   
   private readonly keydownListener = this.handleKeydown.bind(this);
+  private readonly keyupListener = this.handleKeyup.bind(this);
+  private readonly blurListener = this.handleWindowBlur.bind(this);
+  private readonly visibilityListener = this.handleVisibilityChange.bind(this);
   private isListening = false;
   protected isBrowser: boolean;
+  // Track currently physically pressed keys (lowercased). This lets us detect chords
+  // formed by multiple non-modifier keys (e.g., ['c', 'a']). It is populated by
+  // keydown/keyup listeners and used by handleKeydown to build the pressed key set.
+  private readonly currentlyDownKeys = new Set<string>();
 
   constructor() {
     // Use try-catch to handle injection context for better testability
@@ -388,7 +395,15 @@ export class KeyboardShortcuts implements OnDestroy {
       return;
     }
     
+    // Listen to both keydown and keyup so we can maintain a Set of currently
+    // pressed physical keys. We avoid passive:true because we may call
+    // preventDefault() when matching shortcuts.
     document.addEventListener('keydown', this.keydownListener, { passive: false });
+    document.addEventListener('keyup', this.keyupListener, { passive: false });
+    // Listen for blur/visibility changes so we can clear the currently-down keys
+    // and avoid stale state when the browser or tab loses focus.
+    window.addEventListener('blur', this.blurListener);
+    document.addEventListener('visibilitychange', this.visibilityListener);
     this.isListening = true;
   }
 
@@ -398,20 +413,30 @@ export class KeyboardShortcuts implements OnDestroy {
     }
     
     document.removeEventListener('keydown', this.keydownListener);
+    document.removeEventListener('keyup', this.keyupListener);
+    window.removeEventListener('blur', this.blurListener);
+    document.removeEventListener('visibilitychange', this.visibilityListener);
     this.isListening = false;
   }
 
   protected handleKeydown(event: KeyboardEvent): void {
-    const pressedKeys = this.getPressedKeys(event);
+    // Update the currently down keys with this event's key
+    this.updateCurrentlyDownKeysOnKeydown(event);
+
+    // Build the pressed keys set used for matching. Prefer the currentlyDownKeys
+    // if it contains more than one non-modifier key; otherwise fall back to the
+    // traditional per-event pressed keys calculation for compatibility.
+  // Use a Set for matching to avoid allocations and sorting on every event
+  const pressedKeys = this.buildPressedKeysForMatch(event);
     const isMac = this.isMacPlatform();
     
     for (const shortcutId of this.activeShortcuts) {
       const shortcut = this.shortcuts.get(shortcutId);
       if (!shortcut) continue;
       
-      const targetKeys = isMac ? shortcut.macKeys : shortcut.keys;
-      
-      if (this.keysMatch(pressedKeys, targetKeys)) {
+  const targetKeys = isMac ? shortcut.macKeys : shortcut.keys;
+
+  if (this.keysMatch(pressedKeys, targetKeys)) {
         event.preventDefault();
         event.stopPropagation();
         
@@ -424,6 +449,111 @@ export class KeyboardShortcuts implements OnDestroy {
         break; // Only execute the first matching shortcut
       }
     }
+  }
+
+  protected handleKeyup(event: KeyboardEvent): void {
+    // Remove the key from currentlyDownKeys on keyup
+    const key = event.key ? event.key.toLowerCase() : '';
+    if (key && !['control', 'alt', 'shift', 'meta'].includes(key)) {
+      this.currentlyDownKeys.delete(key);
+    }
+  }
+
+  /**
+   * Clear the currently-down keys. Exposed for testing and for use by
+   * blur/visibilitychange handlers to avoid stale state when the page loses focus.
+   */
+  clearCurrentlyDownKeys(): void {
+    this.currentlyDownKeys.clear();
+  }
+
+  protected handleWindowBlur(): void {
+    this.clearCurrentlyDownKeys();
+  }
+
+  protected handleVisibilityChange(): void {
+    if (document.visibilityState === 'hidden') {
+      this.clearCurrentlyDownKeys();
+    }
+  }
+
+  /**
+   * Update the currentlyDownKeys set when keydown events happen.
+   * Normalizes common keys (function keys, space, etc.) to the same values
+   * used by getPressedKeys/keysMatch.
+   */
+  protected updateCurrentlyDownKeysOnKeydown(event: KeyboardEvent): void {
+    const key = event.key ? event.key.toLowerCase() : '';
+
+    // Ignore modifier-only keydown entries
+    if (['control', 'alt', 'shift', 'meta'].includes(key)) {
+      return;
+    }
+
+    // Normalize some special cases similar to the demo component's recording logic
+    if (event.code && event.code.startsWith('F') && /^F\d+$/.test(event.code)) {
+      this.currentlyDownKeys.add(event.code.toLowerCase());
+      return;
+    }
+
+    if (key === ' ') {
+      this.currentlyDownKeys.add('space');
+      return;
+    }
+
+    if (key === 'escape') {
+      this.currentlyDownKeys.add('escape');
+      return;
+    }
+
+    if (key === 'enter') {
+      this.currentlyDownKeys.add('enter');
+      return;
+    }
+
+    if (key && key.length > 0) {
+      this.currentlyDownKeys.add(key);
+    }
+  }
+
+  /**
+   * Build the pressed keys array used for matching against registered shortcuts.
+   * If multiple non-modifier keys are currently down, include them (chord support).
+   * Otherwise fall back to single main-key detection from the event for compatibility.
+   */
+  /**
+   * Build the pressed keys set used for matching against registered shortcuts.
+   * If multiple non-modifier keys are currently down, include them (chord support).
+   * Otherwise fall back to single main-key detection from the event for compatibility.
+   *
+   * Returns a Set<string> (lowercased) to allow O(1) lookups and O(n) comparisons
+   * without sorting or allocating sorted arrays on every event.
+   */
+  protected buildPressedKeysForMatch(event: KeyboardEvent): Set<string> {
+    const modifiers = new Set<string>();
+    if (event.ctrlKey) modifiers.add('ctrl');
+    if (event.altKey) modifiers.add('alt');
+    if (event.shiftKey) modifiers.add('shift');
+    if (event.metaKey) modifiers.add('meta');
+
+    // Collect non-modifier keys from currentlyDownKeys (excluding modifiers)
+    const nonModifierKeys = Array.from(this.currentlyDownKeys).filter(k => !['control', 'alt', 'shift', 'meta'].includes(k));
+
+    const result = new Set<string>();
+    // Add modifiers first
+    modifiers.forEach(m => result.add(m));
+
+    if (nonModifierKeys.length > 0) {
+      nonModifierKeys.forEach(k => result.add(k.toLowerCase()));
+      return result;
+    }
+
+    // Fallback: single main key from the event (existing behavior)
+    const key = event.key.toLowerCase();
+    if (!['control', 'alt', 'shift', 'meta'].includes(key)) {
+      result.add(key);
+    }
+    return result;
   }
 
   protected getPressedKeys(event: KeyboardEvent): string[] {
@@ -443,16 +573,30 @@ export class KeyboardShortcuts implements OnDestroy {
     return keys;
   }
 
-  protected keysMatch(pressedKeys: string[], targetKeys: string[]): boolean {
-    if (pressedKeys.length !== targetKeys.length) {
+  /**
+   * Compare pressed keys against a target key combination.
+   * Accepts either a Set<string> (preferred) or an array for backwards compatibility.
+   * Uses Set-based comparison: sizes must match and every element in target must exist in pressed.
+   */
+  protected keysMatch(pressedKeys: Set<string> | string[], targetKeys: string[]): boolean {
+    // Normalize targetKeys into a Set<string> (lowercased)
+    const normalizedTarget = new Set<string>(targetKeys.map(k => k.toLowerCase()));
+
+    // Normalize pressedKeys into a Set<string> if it's an array
+    const pressedSet: Set<string> = Array.isArray(pressedKeys)
+      ? new Set<string>(pressedKeys.map(k => k.toLowerCase()))
+      : new Set<string>(Array.from(pressedKeys).map(k => k.toLowerCase()));
+
+    if (pressedSet.size !== normalizedTarget.size) {
       return false;
     }
-    
-    // Normalize and sort both arrays for comparison
-    const normalizedPressed = pressedKeys.map(key => key.toLowerCase()).sort();
-    const normalizedTarget = targetKeys.map(key => key.toLowerCase()).sort();
-    
-    return normalizedPressed.every((key, index) => key === normalizedTarget[index]);
+
+    for (const key of normalizedTarget) {
+      if (!pressedSet.has(key)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   protected isMacPlatform(): boolean {
