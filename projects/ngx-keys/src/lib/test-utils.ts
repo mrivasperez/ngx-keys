@@ -28,6 +28,8 @@ export interface MockShortcutConfig {
   id?: string;
   keys?: string[];
   macKeys?: string[];
+  steps?: string[][];
+  macSteps?: string[][];
   description?: string;
   action?: (() => void);
   activeUntil?: unknown;
@@ -44,10 +46,14 @@ export class TestableKeyboardShortcuts extends KeyboardShortcuts {
     (this as any).isListening = false;
   }
 
+  // Expose protected blur/visibility handlers for tests
+  public testHandleWindowBlur = this.handleWindowBlur.bind(this);
+
   // Make protected methods public for testing
   public testHandleKeydown = this.handleKeydown.bind(this);
   public testGetPressedKeys = (event: KeyboardEvent) => this.getPressedKeys(event);
   public testKeysMatch = (pressed: string[], target: string[]) => this.keysMatch(pressed, target);
+  public testStepsMatch = (a: string[][], b: string[][]) => this.stepsMatch(a, b);
   public testIsMacPlatform = () => this.isMacPlatform();
 }
 
@@ -57,14 +63,25 @@ export class TestableKeyboardShortcuts extends KeyboardShortcuts {
 export function createMockShortcut(config: MockShortcutConfig = {}): KeyboardShortcut {
   const defaultAction = config.action || (() => {}); // Default to no-op function
   
-  return {
+  const shortcut: KeyboardShortcut = {
     id: config.id || 'test-shortcut',
-    keys: config.keys || ['ctrl', 's'],
-    macKeys: config.macKeys || ['meta', 's'],
     action: defaultAction,
     description: config.description || 'Test shortcut',
     ...(config.activeUntil !== undefined && { activeUntil: config.activeUntil as any })
   };
+
+  // Support both single-step and multi-step shortcuts
+  if (config.steps || config.macSteps) {
+    // Multi-step shortcut
+    if (config.steps) shortcut.steps = config.steps;
+    if (config.macSteps) shortcut.macSteps = config.macSteps;
+  } else {
+    // Single-step shortcut (legacy)
+    shortcut.keys = config.keys || ['ctrl', 's'];
+    shortcut.macKeys = config.macKeys || ['meta', 's'];
+  }
+
+  return shortcut;
 }
 
 /**
@@ -110,8 +127,75 @@ export const KeyboardEvents = {
   f1: () => createKeyboardEvent({ key: 'F1' }),
   allModifiers: (key: string) => createKeyboardEvent({ 
     key, ctrlKey: true, altKey: true, shiftKey: true, metaKey: true 
-  })
+  }),
+  // Multi-step convenience events
+  ctrlK: () => createKeyboardEvent({ key: 'k', ctrlKey: true }),
+  metaK: () => createKeyboardEvent({ key: 'k', metaKey: true }),
+  plain: (key: string) => createKeyboardEvent({ key })
 };
+
+/**
+ * Helper function to create a multi-step mock shortcut
+ */
+export function createMultiStepMockShortcut(config: {
+  id?: string;
+  steps: string[][];
+  macSteps?: string[][];
+  action?: () => void;
+  description?: string;
+}): KeyboardShortcut {
+  return createMockShortcut({
+    id: config.id,
+    steps: config.steps,
+    macSteps: config.macSteps || config.steps, // Default to same as steps
+    action: config.action,
+    description: config.description || 'Multi-step test shortcut'
+  });
+}
+
+/**
+ * Helper to simulate a complete multi-step sequence
+ */
+export function simulateMultiStepSequence(
+  service: TestableKeyboardShortcuts, 
+  steps: string[][], 
+  delay: number = 100
+): void {
+  steps.forEach((step, index) => {
+    setTimeout(() => {
+      const event = createStepEvent(step);
+      service.testHandleKeydown(event);
+    }, index * delay);
+  });
+}
+
+/**
+ * Helper to create a keyboard event from a step (array of keys)
+ */
+export function createStepEvent(step: string[]): KeyboardEvent {
+  const modifiers = {
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    metaKey: false
+  };
+  
+  let mainKey = '';
+  
+  step.forEach(key => {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === 'ctrl') modifiers.ctrlKey = true;
+    else if (lowerKey === 'alt') modifiers.altKey = true;
+    else if (lowerKey === 'shift') modifiers.shiftKey = true;
+    else if (lowerKey === 'meta' || lowerKey === 'cmd' || lowerKey === 'command') modifiers.metaKey = true;
+    else mainKey = key;
+  });
+  
+  return createKeyboardEvent({
+    key: mainKey,
+    ...modifiers
+  });
+}
 
 /**
  * Fake DestroyRef for testing activeUntil functionality

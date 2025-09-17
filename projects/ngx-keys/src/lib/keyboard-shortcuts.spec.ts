@@ -3,7 +3,7 @@ import { KeyboardShortcut } from './keyboard-shortcut.interface';
 import { KeyboardShortcutsErrors } from './keyboard-shortcuts.errors';
 import * as ngCore from '@angular/core';
 import { of } from 'rxjs';
-import { 
+import {
   TestableKeyboardShortcuts,
   createMockShortcut,
   createMockShortcuts,
@@ -11,7 +11,9 @@ import {
   KeyboardEvents,
   TestKeyboardShortcutsWithFakeDestruct,
   TestObservables,
-  NonBrowserKeyboardShortcuts
+  NonBrowserKeyboardShortcuts,
+  createMultiStepMockShortcut,
+  createStepEvent
 } from './test-utils';
 
 describe('KeyboardShortcuts', () => {
@@ -142,7 +144,7 @@ describe('KeyboardShortcuts', () => {
     describe('activeUntil cleanup', () => {
       it('should handle undefined activeUntil gracefully', () => {
         const mockAction = jasmine.createSpy('mockAction');
-        
+
         const shortcut: KeyboardShortcut = {
           id: 'no-activeuntil-test',
           keys: ['f3'],
@@ -614,7 +616,7 @@ describe('KeyboardShortcuts', () => {
     it('should handle multiple different chords without interference', () => {
       const chordAction1 = jasmine.createSpy('chord1Action');
       const chordAction2 = jasmine.createSpy('chord2Action');
-      
+
       service.register(createMockShortcut({
         id: 'chord-first',
         keys: ['j', 'k'],
@@ -640,7 +642,7 @@ describe('KeyboardShortcuts', () => {
 
       // Clear currently pressed keys to ensure clean state for second chord
       service.clearCurrentlyDownKeys();
-      
+
       // Reset spy calls and trigger second chord
       chordAction1.calls.reset();
       chordAction2.calls.reset();
@@ -772,6 +774,81 @@ describe('KeyboardShortcuts', () => {
       testableService.testHandleKeydown(event);
       expect(action1).toHaveBeenCalled();
       expect(action2).not.toHaveBeenCalled();
+    });
+
+    it('should not execute multi-step shortcut if timeout occurs before next step', (done) => {
+      const multiAction = jasmine.createSpy('multiActionTimeout');
+      const shortcut = {
+        id: 'multi-2',
+        steps: [['ctrl', 'k'], ['s']],
+        macSteps: [['meta', 'k'], ['s']],
+        action: multiAction,
+        description: 'Multi-step timeout'
+      } as any as KeyboardShortcut;
+
+      service.register(shortcut);
+      const testableService = service as any;
+
+      // First step
+      const event1 = new KeyboardEvent('keydown', { ctrlKey: true, key: 'k' });
+      testableService.testHandleKeydown(event1);
+
+      // Wait longer than default sequenceTimeout (2s)
+      setTimeout(() => {
+        const event2 = new KeyboardEvent('keydown', { key: 's' });
+        testableService.testHandleKeydown(event2);
+        expect(multiAction).not.toHaveBeenCalled();
+        done();
+      }, 2200);
+    });
+  });
+
+  describe('Multi-step Shortcuts', () => {
+    it('should execute multi-step shortcut when steps are entered in sequence', (done) => {
+      const action = jasmine.createSpy('multiStepAction');
+      const shortcut = createMultiStepMockShortcut({
+        id: 'multi-step-test',
+        // Use a two-step sequence: ctrl+k, then plain 's' for reliability in tests
+        steps: [['ctrl', 'k'], ['s']],
+        action,
+      });
+
+      service.register(shortcut);
+
+      // Simulate the first step (ctrl+k)
+      service.testHandleKeydown(KeyboardEvents.ctrlK());
+
+      // Simulate the second step shortly after (plain 's' key)
+      setTimeout(() => {
+        service.testHandleKeydown(KeyboardEvents.plain('s'));
+      }, 50);
+
+      setTimeout(() => {
+        expect(action).toHaveBeenCalled();
+        done();
+      }, 200);
+    });
+
+    it('should clear pending multi-step sequence on window blur', () => {
+      const action = jasmine.createSpy('multiStepActionBlur');
+      const shortcut = createMultiStepMockShortcut({
+        id: 'multi-step-blur',
+        steps: [['ctrl', 'k'], ['s']],
+        action,
+      });
+
+      service.register(shortcut);
+
+      // Start the sequence by sending the first step
+      service.testHandleKeydown(KeyboardEvents.ctrlK());
+
+  // Simulate window blur which should clear the pending sequence
+  service.testHandleWindowBlur();
+
+  // Send the second step - action should NOT be called because sequence was cleared
+  service.testHandleKeydown(KeyboardEvents.plain('s'));
+
+      expect(action).not.toHaveBeenCalled();
     });
   });
 

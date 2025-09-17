@@ -1,6 +1,6 @@
 import { DestroyRef, Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutGroup, KeyboardShortcutUI } from './keyboard-shortcut.interface'
+import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutGroup, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
 import { Observable, take } from 'rxjs';
 
@@ -12,6 +12,7 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly groups = new Map<string, KeyboardShortcutGroup>();
   private readonly activeShortcuts = new Set<string>();
   private readonly activeGroups = new Set<string>();
+  private readonly currentlyDownKeys = new Set<string>();
   
   // Single consolidated state signal - reduces memory overhead
   private readonly state = signal({
@@ -60,10 +61,15 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly visibilityListener = this.handleVisibilityChange.bind(this);
   private isListening = false;
   protected isBrowser: boolean;
-  // Track currently physically pressed keys (lowercased). This lets us detect chords
-  // formed by multiple non-modifier keys (e.g., ['c', 'a']). It is populated by
-  // keydown/keyup listeners and used by handleKeydown to build the pressed key set.
-  private readonly currentlyDownKeys = new Set<string>();
+  /** Default timeout (ms) for completing a multi-step sequence */
+  protected sequenceTimeout = 2000;
+
+  /** Runtime state for multi-step sequences */
+  private pendingSequence: {
+    shortcutId: string;
+    stepIndex: number;
+    timerId: any;
+  } | null = null;
 
   constructor() {
     // Use try-catch to handle injection context for better testability
@@ -103,8 +109,8 @@ export class KeyboardShortcuts implements OnDestroy {
   formatShortcutForUI(shortcut: KeyboardShortcut): KeyboardShortcutUI {
     return {
       id: shortcut.id,
-      keys: this.formatKeysForDisplay(shortcut.keys, false),
-      macKeys: this.formatKeysForDisplay(shortcut.macKeys, true),
+      keys: this.formatStepsForDisplay(shortcut.keys ?? shortcut.steps ?? [], false),
+      macKeys: this.formatStepsForDisplay(shortcut.macKeys ?? shortcut.macSteps ?? [], true),
       description: shortcut.description
     };
   }
@@ -140,16 +146,45 @@ export class KeyboardShortcuts implements OnDestroy {
       .join('+');
   }
 
+  private formatStepsForDisplay(steps: string[] | string[][], isMac = false): string {
+    if (!steps) return '';
+
+    // If the first element is an array, assume steps is string[][]
+    const normalized = this.normalizeToSteps(steps as KeyStep[] | string[]);
+    if (normalized.length === 0) return '';
+    if (normalized.length === 1) return this.formatKeysForDisplay(normalized[0], isMac);
+    return normalized.map(step => this.formatKeysForDisplay(step, isMac)).join(', ');
+  }
+
+  private normalizeToSteps(input: KeyStep[] | string[]): KeyStep[] {
+    if (!input) return [];
+    // If first element is an array, assume already KeyStep[]
+    if (Array.isArray(input[0])) {
+      return input as KeyStep[];
+    }
+    // Single step array
+    return [input as string[]];
+  }
+
   /**
    * Check if a key combination is already registered
    * @returns The ID of the conflicting shortcut, or null if no conflict
    */
   private findConflict(newShortcut: KeyboardShortcut): string | null {
     for (const existing of this.shortcuts.values()) {
-      if (this.keysMatch(newShortcut.keys, existing.keys)) {
+      // Compare single-step shapes if provided
+      if (newShortcut.keys && existing.keys && this.keysMatch(newShortcut.keys, existing.keys)) {
         return existing.id;
       }
-      if (this.keysMatch(newShortcut.macKeys, existing.macKeys)) {
+      if (newShortcut.macKeys && existing.macKeys && this.keysMatch(newShortcut.macKeys, existing.macKeys)) {
+        return existing.id;
+      }
+
+      // Compare multi-step shapes
+      if (newShortcut.steps && existing.steps && this.stepsMatch(newShortcut.steps, existing.steps)) {
+        return existing.id;
+      }
+      if (newShortcut.macSteps && existing.macSteps && this.stepsMatch(newShortcut.macSteps, existing.macSteps)) {
         return existing.id;
       }
     }
@@ -429,24 +464,93 @@ export class KeyboardShortcuts implements OnDestroy {
   // Use a Set for matching to avoid allocations and sorting on every event
   const pressedKeys = this.buildPressedKeysForMatch(event);
     const isMac = this.isMacPlatform();
-    
+
+    // If there is a pending multi-step sequence, try to advance it first
+    if (this.pendingSequence) {
+      const pending = this.pendingSequence;
+      const shortcut = this.shortcuts.get(pending.shortcutId);
+      if (shortcut) {
+        const steps = isMac
+          ? (shortcut.macSteps ?? shortcut.macKeys ?? shortcut.steps ?? shortcut.keys ?? [])
+          : (shortcut.steps ?? shortcut.keys ?? shortcut.macSteps ?? shortcut.macKeys ?? []);
+        const normalizedSteps = this.normalizeToSteps(steps as KeyStep[] | string[]);
+        const expected = normalizedSteps[pending.stepIndex];
+
+        // Use per-event pressed keys for advancing sequence steps. Relying on
+        // the accumulated `currentlyDownKeys` can accidentally include keys
+        // from previous steps (if tests or callers don't emit keyup), which
+        // would prevent matching a simple single-key step like ['s'] after
+        // a prior ['k'] step. Use getPressedKeys(event) which reflects the
+        // actual modifier/main-key state for this event.
+        const stepPressed = this.getPressedKeys(event);
+
+        if (expected && this.keysMatch(stepPressed, expected)) {
+          // Advance sequence
+          clearTimeout(pending.timerId);
+          pending.stepIndex += 1;
+
+          if (pending.stepIndex >= normalizedSteps.length) {
+            // Completed
+            event.preventDefault();
+            event.stopPropagation();
+            try {
+              shortcut.action();
+            } catch (error) {
+              console.error(`Error executing keyboard shortcut "${shortcut.id}":`, error);
+            }
+            this.pendingSequence = null;
+            return;
+          }
+
+          // Reset timer for next step
+          pending.timerId = setTimeout(() => { this.pendingSequence = null; }, this.sequenceTimeout);
+          return;
+        } else {
+          // Cancel pending if doesn't match
+          this.clearPendingSequence();
+        }
+      } else {
+  // pending exists but shortcut not found
+  this.clearPendingSequence();
+      }
+    }
+
+    // No pending sequence - check active shortcuts for a match or sequence start
     for (const shortcutId of this.activeShortcuts) {
       const shortcut = this.shortcuts.get(shortcutId);
       if (!shortcut) continue;
-      
-  const targetKeys = isMac ? shortcut.macKeys : shortcut.keys;
 
-  if (this.keysMatch(pressedKeys, targetKeys)) {
-        event.preventDefault();
-        event.stopPropagation();
-        
-        try {
-          shortcut.action();
-        } catch (error) {
-          console.error(`Error executing keyboard shortcut "${shortcut.id}":`, error);
+      const steps = isMac
+        ? (shortcut.macSteps ?? shortcut.macKeys ?? shortcut.steps ?? shortcut.keys ?? [])
+        : (shortcut.steps ?? shortcut.keys ?? shortcut.macSteps ?? shortcut.macKeys ?? []);
+      const normalizedSteps = this.normalizeToSteps(steps as KeyStep[] | string[]);
+
+      const firstStep = normalizedSteps[0];
+      if (this.keysMatch(pressedKeys, firstStep)) {
+        if (normalizedSteps.length === 1) {
+          // single-step
+          event.preventDefault();
+          event.stopPropagation();
+          try {
+            shortcut.action();
+          } catch (error) {
+            console.error(`Error executing keyboard shortcut "${shortcut.id}":`, error);
+          }
+          break;
+        } else {
+          // start pending sequence
+          if (this.pendingSequence) {
+            this.clearPendingSequence();
+          }
+          this.pendingSequence = {
+            shortcutId: shortcut.id,
+            stepIndex: 1,
+            timerId: setTimeout(() => { this.pendingSequence = null; }, this.sequenceTimeout)
+          };
+          event.preventDefault();
+          event.stopPropagation();
+          return;
         }
-        
-        break; // Only execute the first matching shortcut
       }
     }
   }
@@ -469,11 +573,18 @@ export class KeyboardShortcuts implements OnDestroy {
 
   protected handleWindowBlur(): void {
     this.clearCurrentlyDownKeys();
+    // Clear any pressed keys and any pending multi-step sequence to avoid
+    // stale state when the window loses focus.
+    this.clearPendingSequence();
   }
 
   protected handleVisibilityChange(): void {
     if (document.visibilityState === 'hidden') {
+      // When the document becomes hidden, clear both pressed keys and any
+      // pending multi-step sequence. This prevents sequences from remaining
+      // active when the user switches tabs or minimizes the window.
       this.clearCurrentlyDownKeys();
+      this.clearPendingSequence();
     }
   }
 
@@ -590,13 +701,33 @@ export class KeyboardShortcuts implements OnDestroy {
     if (pressedSet.size !== normalizedTarget.size) {
       return false;
     }
-
+    
+    // Check if every element in normalizedTarget exists in pressedSet
     for (const key of normalizedTarget) {
       if (!pressedSet.has(key)) {
         return false;
       }
     }
+    
     return true;
+  }
+
+  /** Compare two multi-step sequences for equality */
+  protected stepsMatch(a: string[][], b: string[][]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!this.keysMatch(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  /** Safely clear any pending multi-step sequence */
+  private clearPendingSequence(): void {
+    if (!this.pendingSequence) return;
+    try {
+      clearTimeout(this.pendingSequence.timerId);
+    } catch { /* ignore */ }
+    this.pendingSequence = null;
   }
 
   protected isMacPlatform(): boolean {
