@@ -1,9 +1,15 @@
+import { DestroyRef } from "@angular/core";
+import { Observable } from "rxjs";
+
+export type KeyboardShortcutActiveUntil = Observable<unknown> | DestroyRef | 'destruct'
+
 export interface KeyboardShortcut {
   id: string;
   keys: string[];
   macKeys: string[];
   action: () => void;
   description: string;
+  activeUntil?: KeyboardShortcutActiveUntil
 }
 
 export interface KeyboardShortcutGroup {
