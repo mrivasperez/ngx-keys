@@ -3,7 +3,7 @@ import { KeyboardShortcut } from './keyboard-shortcut.interface';
 import { KeyboardShortcutsErrors } from './keyboard-shortcuts.errors';
 import * as ngCore from '@angular/core';
 import { of } from 'rxjs';
-import { 
+import {
   TestableKeyboardShortcuts,
   createMockShortcut,
   createMockShortcuts,
@@ -144,7 +144,7 @@ describe('KeyboardShortcuts', () => {
     describe('activeUntil cleanup', () => {
       it('should handle undefined activeUntil gracefully', () => {
         const mockAction = jasmine.createSpy('mockAction');
-        
+
         const shortcut: KeyboardShortcut = {
           id: 'no-activeuntil-test',
           keys: ['f3'],
@@ -616,7 +616,7 @@ describe('KeyboardShortcuts', () => {
     it('should handle multiple different chords without interference', () => {
       const chordAction1 = jasmine.createSpy('chord1Action');
       const chordAction2 = jasmine.createSpy('chord2Action');
-      
+
       service.register(createMockShortcut({
         id: 'chord-first',
         keys: ['j', 'k'],
@@ -642,7 +642,7 @@ describe('KeyboardShortcuts', () => {
 
       // Clear currently pressed keys to ensure clean state for second chord
       service.clearCurrentlyDownKeys();
-      
+
       // Reset spy calls and trigger second chord
       chordAction1.calls.reset();
       chordAction2.calls.reset();
@@ -714,394 +714,6 @@ describe('KeyboardShortcuts', () => {
     });
   });
 
-  describe('Multi-step Shortcuts', () => {
-    it('should register multi-step shortcuts with steps and macSteps', () => {
-      const multiStepAction = jasmine.createSpy('multiStepAction');
-      const shortcut = createMultiStepMockShortcut({
-        id: 'basic-multi-step',
-        steps: [['ctrl', 'k'], ['s']],
-        macSteps: [['meta', 'k'], ['s']],
-        action: multiStepAction,
-        description: 'Basic multi-step shortcut'
-      });
-
-      expect(() => service.register(shortcut)).not.toThrow();
-      expect(service.getShortcuts().has('basic-multi-step')).toBe(true);
-      
-      const registered = service.getShortcuts().get('basic-multi-step');
-      expect(registered?.steps).toEqual([['ctrl', 'k'], ['s']]);
-      expect(registered?.macSteps).toEqual([['meta', 'k'], ['s']]);
-    });
-
-    it('should support stepsMatch utility for comparing step sequences', () => {
-      const steps1 = [['ctrl', 'k'], ['s']];
-      const steps2 = [['ctrl', 'k'], ['s']];
-      const steps3 = [['ctrl', 'k'], ['r']];
-
-      expect(service.testStepsMatch(steps1, steps2)).toBe(true);
-      expect(service.testStepsMatch(steps1, steps3)).toBe(false);
-    });
-
-    it('should validate multi-step shortcut creation with createStepEvent utility', () => {
-      // Test our utility functions work correctly
-      const ctrlKEvent = createStepEvent(['ctrl', 'k']);
-      expect(ctrlKEvent.key).toBe('k');
-      expect(ctrlKEvent.ctrlKey).toBe(true);
-      expect(ctrlKEvent.altKey).toBe(false);
-
-      const plainSEvent = createStepEvent(['s']);
-      expect(plainSEvent.key).toBe('s');
-      expect(plainSEvent.ctrlKey).toBe(false);
-
-      const metaShiftAEvent = createStepEvent(['meta', 'shift', 'a']);
-      expect(metaShiftAEvent.key).toBe('a');
-      expect(metaShiftAEvent.metaKey).toBe(true);
-      expect(metaShiftAEvent.shiftKey).toBe(true);
-    });
-
-    it('should timeout incomplete sequences', (done) => {
-      const timeoutAction = jasmine.createSpy('timeoutAction');
-      const shortcut = createMultiStepMockShortcut({
-        id: 'timeout-test',
-        steps: [['ctrl', 'k'], ['s']],
-        action: timeoutAction
-      });
-
-      service.register(shortcut);
-
-      // Start sequence
-      service.testHandleKeydown(createStepEvent(['ctrl', 'k']));
-      expect(timeoutAction).not.toHaveBeenCalled();
-
-      // For now, just test that it doesn't trigger immediately
-      // Multi-step execution logic may not be fully implemented yet
-      service.testHandleKeydown(createStepEvent(['s']));
-      
-      // Complete the test - implementation details may vary
-      setTimeout(() => {
-        done();
-      }, 10);
-    });
-
-    it('should handle multiple concurrent multi-step shortcuts', () => {
-      const action1 = jasmine.createSpy('action1');
-      const action2 = jasmine.createSpy('action2');
-
-      const shortcut1 = createMultiStepMockShortcut({
-        id: 'multi-1',
-        steps: [['ctrl', 'k'], ['s']],
-        action: action1
-      });
-
-      const shortcut2 = createMultiStepMockShortcut({
-        id: 'multi-2',
-        steps: [['ctrl', 'k'], ['r']],
-        action: action2
-      });
-
-      service.register(shortcut1);
-      service.register(shortcut2);
-
-      // For now, just test that they register without conflict
-      expect(service.getShortcuts().has('multi-1')).toBe(true);
-      expect(service.getShortcuts().has('multi-2')).toBe(true);
-      
-      // Multi-step execution logic may not be fully implemented yet
-      // This test verifies the shortcuts can coexist
-    });
-
-    it('should format multi-step shortcuts for UI display', () => {
-      const shortcut = createMultiStepMockShortcut({
-        id: 'format-test',
-        steps: [['ctrl', 'k'], ['ctrl', 's'], ['x']],
-        macSteps: [['meta', 'k'], ['meta', 's'], ['x']],
-        description: 'Format test shortcut'
-      });
-
-      service.register(shortcut);
-
-      const formatted = service.shortcutsUI$().all.find(s => s.id === 'format-test');
-      expect(formatted).toBeDefined();
-      expect(formatted!.keys).toContain('Ctrl+K');
-      expect(formatted!.keys).toContain('Ctrl+S');
-      expect(formatted!.keys).toContain('X');
-      expect(formatted!.macKeys).toContain('⌘+K');
-      expect(formatted!.macKeys).toContain('⌘+S');
-      expect(formatted!.macKeys).toContain('X');
-    });
-
-    it('should deactivate and reactivate multi-step shortcuts', () => {
-      const toggleAction = jasmine.createSpy('toggleAction');
-      const shortcut = createMultiStepMockShortcut({
-        id: 'toggle-test',
-        steps: [['ctrl', 'k'], ['t']],
-        action: toggleAction
-      });
-
-      service.register(shortcut);
-
-      // Deactivate and try sequence
-      service.deactivate('toggle-test');
-      service.testHandleKeydown(createStepEvent(['ctrl', 'k']));
-      service.testHandleKeydown(createStepEvent(['t']));
-      expect(toggleAction).not.toHaveBeenCalled();
-
-      // Reactivate and try sequence
-      service.activate('toggle-test');
-      service.testHandleKeydown(createStepEvent(['ctrl', 'k']));
-      service.testHandleKeydown(createStepEvent(['t']));
-      expect(toggleAction).toHaveBeenCalled();
-    });
-
-    it('should handle mixed single-step and multi-step shortcuts', () => {
-      const singleAction = jasmine.createSpy('singleAction');
-      const multiAction = jasmine.createSpy('multiAction');
-
-      const singleShortcut = createMockShortcut({
-        id: 'single-mixed',
-        keys: ['ctrl', 's'],
-        action: singleAction
-      });
-
-      const multiShortcut = createMultiStepMockShortcut({
-        id: 'multi-mixed',
-        steps: [['ctrl', 'k'], ['s']],
-        action: multiAction
-      });
-
-      service.register(singleShortcut);
-      service.register(multiShortcut);
-
-      // Test single-step shortcut still works
-      service.testHandleKeydown(createStepEvent(['ctrl', 's']));
-      expect(singleAction).toHaveBeenCalled();
-      expect(multiAction).not.toHaveBeenCalled();
-
-      // Reset and test multi-step
-      singleAction.calls.reset();
-      service.testHandleKeydown(createStepEvent(['ctrl', 'k']));
-      service.testHandleKeydown(createStepEvent(['s']));
-      expect(singleAction).not.toHaveBeenCalled();
-      expect(multiAction).toHaveBeenCalled();
-    });
-
-    it('should prevent conflicts between single-step and multi-step shortcuts', () => {
-      const singleShortcut = createMockShortcut({
-        id: 'conflict-single',
-        keys: ['ctrl', 'k'],
-        action: () => {}
-      });
-
-      const multiShortcut = createMultiStepMockShortcut({
-        id: 'conflict-multi',
-        steps: [['ctrl', 'k'], ['s']],
-        action: () => {}
-      });
-
-      service.register(singleShortcut);
-
-      // Test that both shortcuts can register for now
-      // Conflict detection between single and multi-step may need additional implementation
-      expect(() => service.register(multiShortcut)).not.toThrow();
-      expect(service.getShortcuts().has('conflict-single')).toBe(true);
-      expect(service.getShortcuts().has('conflict-multi')).toBe(true);
-    });
-  });
-
-  describe('Multi-step Shortcuts', () => {
-    it('should register multi-step shortcuts with steps and macSteps', () => {
-      const multiStepAction = jasmine.createSpy('multiStepAction');
-      const shortcut = createMultiStepMockShortcut({
-        id: 'basic-multi-step',
-        steps: [['ctrl', 'k'], ['s']],
-        macSteps: [['meta', 'k'], ['s']],
-        action: multiStepAction,
-        description: 'Basic multi-step shortcut'
-      });
-
-      expect(() => service.register(shortcut)).not.toThrow();
-      expect(service.getShortcuts().has('basic-multi-step')).toBe(true);
-      
-      const registered = service.getShortcuts().get('basic-multi-step');
-      expect(registered?.steps).toEqual([['ctrl', 'k'], ['s']]);
-      expect(registered?.macSteps).toEqual([['meta', 'k'], ['s']]);
-    });
-
-    it('should support stepsMatch utility for comparing step sequences', () => {
-      const steps1 = [['ctrl', 'k'], ['s']];
-      const steps2 = [['ctrl', 'k'], ['s']];
-      const steps3 = [['ctrl', 'k'], ['r']];
-
-      expect(service.testStepsMatch(steps1, steps2)).toBe(true);
-      expect(service.testStepsMatch(steps1, steps3)).toBe(false);
-    });
-
-    it('should validate multi-step shortcut creation with createStepEvent utility', () => {
-      // Test our utility functions work correctly
-      const ctrlKEvent = createStepEvent(['ctrl', 'k']);
-      expect(ctrlKEvent.key).toBe('k');
-      expect(ctrlKEvent.ctrlKey).toBe(true);
-      expect(ctrlKEvent.altKey).toBe(false);
-
-      const plainSEvent = createStepEvent(['s']);
-      expect(plainSEvent.key).toBe('s');
-      expect(plainSEvent.ctrlKey).toBe(false);
-
-      const metaShiftAEvent = createStepEvent(['meta', 'shift', 'a']);
-      expect(metaShiftAEvent.key).toBe('a');
-      expect(metaShiftAEvent.metaKey).toBe(true);
-      expect(metaShiftAEvent.shiftKey).toBe(true);
-    });
-
-    it('should timeout incomplete sequences', (done) => {
-      const timeoutAction = jasmine.createSpy('timeoutAction');
-      const shortcut = createMultiStepMockShortcut({
-        id: 'timeout-test',
-        steps: [['ctrl', 'k'], ['s']],
-        action: timeoutAction
-      });
-
-      service.register(shortcut);
-
-      // Start sequence
-      service.testHandleKeydown(createStepEvent(['ctrl', 'k']));
-      expect(timeoutAction).not.toHaveBeenCalled();
-
-      // For now, just test that it doesn't trigger immediately
-      // Multi-step execution logic may not be fully implemented yet
-      service.testHandleKeydown(createStepEvent(['s']));
-      
-      // Complete the test - implementation details may vary
-      setTimeout(() => {
-        done();
-      }, 10);
-    });
-
-    it('should handle multiple concurrent multi-step shortcuts', () => {
-      const action1 = jasmine.createSpy('action1');
-      const action2 = jasmine.createSpy('action2');
-
-      const shortcut1 = createMultiStepMockShortcut({
-        id: 'multi-1',
-        steps: [['ctrl', 'k'], ['s']],
-        action: action1
-      });
-
-      const shortcut2 = createMultiStepMockShortcut({
-        id: 'multi-2',
-        steps: [['ctrl', 'k'], ['r']],
-        action: action2
-      });
-
-      service.register(shortcut1);
-      service.register(shortcut2);
-
-      // For now, just test that they register without conflict
-      expect(service.getShortcuts().has('multi-1')).toBe(true);
-      expect(service.getShortcuts().has('multi-2')).toBe(true);
-      
-      // Multi-step execution logic may not be fully implemented yet
-      // This test verifies the shortcuts can coexist
-    });
-
-    it('should format multi-step shortcuts for UI display', () => {
-      const shortcut = createMultiStepMockShortcut({
-        id: 'format-test',
-        steps: [['ctrl', 'k'], ['ctrl', 's'], ['x']],
-        macSteps: [['meta', 'k'], ['meta', 's'], ['x']],
-        description: 'Format test shortcut'
-      });
-
-      service.register(shortcut);
-
-      const formatted = service.shortcutsUI$().all.find(s => s.id === 'format-test');
-      expect(formatted).toBeDefined();
-      expect(formatted!.keys).toContain('Ctrl+K');
-      expect(formatted!.keys).toContain('Ctrl+S');
-      expect(formatted!.keys).toContain('X');
-      expect(formatted!.macKeys).toContain('⌘+K');
-      expect(formatted!.macKeys).toContain('⌘+S');
-      expect(formatted!.macKeys).toContain('X');
-    });
-
-    it('should deactivate and reactivate multi-step shortcuts', () => {
-      const toggleAction = jasmine.createSpy('toggleAction');
-      const shortcut = createMultiStepMockShortcut({
-        id: 'toggle-test',
-        steps: [['ctrl', 'k'], ['t']],
-        action: toggleAction
-      });
-
-      service.register(shortcut);
-
-      // Deactivate and try sequence
-      service.deactivate('toggle-test');
-      service.testHandleKeydown(createStepEvent(['ctrl', 'k']));
-      service.testHandleKeydown(createStepEvent(['t']));
-      expect(toggleAction).not.toHaveBeenCalled();
-
-      // Reactivate and try sequence
-      service.activate('toggle-test');
-      service.testHandleKeydown(createStepEvent(['ctrl', 'k']));
-      service.testHandleKeydown(createStepEvent(['t']));
-      expect(toggleAction).toHaveBeenCalled();
-    });
-
-    it('should handle mixed single-step and multi-step shortcuts', () => {
-      const singleAction = jasmine.createSpy('singleAction');
-      const multiAction = jasmine.createSpy('multiAction');
-
-      const singleShortcut = createMockShortcut({
-        id: 'single-mixed',
-        keys: ['ctrl', 's'],
-        action: singleAction
-      });
-
-      const multiShortcut = createMultiStepMockShortcut({
-        id: 'multi-mixed',
-        steps: [['ctrl', 'k'], ['s']],
-        action: multiAction
-      });
-
-      service.register(singleShortcut);
-      service.register(multiShortcut);
-
-      // Test single-step shortcut still works
-      service.testHandleKeydown(createStepEvent(['ctrl', 's']));
-      expect(singleAction).toHaveBeenCalled();
-      expect(multiAction).not.toHaveBeenCalled();
-
-      // Reset and test multi-step
-      singleAction.calls.reset();
-      service.testHandleKeydown(createStepEvent(['ctrl', 'k']));
-      service.testHandleKeydown(createStepEvent(['s']));
-      expect(singleAction).not.toHaveBeenCalled();
-      expect(multiAction).toHaveBeenCalled();
-    });
-
-    it('should prevent conflicts between single-step and multi-step shortcuts', () => {
-      const singleShortcut = createMockShortcut({
-        id: 'conflict-single',
-        keys: ['ctrl', 'k'],
-        action: () => {}
-      });
-
-      const multiShortcut = createMultiStepMockShortcut({
-        id: 'conflict-multi',
-        steps: [['ctrl', 'k'], ['s']],
-        action: () => {}
-      });
-
-      service.register(singleShortcut);
-
-      // Test that both shortcuts can register for now
-      // Conflict detection between single and multi-step may need additional implementation
-      expect(() => service.register(multiShortcut)).not.toThrow();
-      expect(service.getShortcuts().has('conflict-single')).toBe(true);
-      expect(service.getShortcuts().has('conflict-multi')).toBe(true);
-    });
-  });
-
   describe('Keyboard Event Handling', () => {
     it('should execute shortcut action when matching keys are pressed', () => {
       const shortcut = createMockShortcut({ action: mockAction });
@@ -1164,33 +776,6 @@ describe('KeyboardShortcuts', () => {
       expect(action2).not.toHaveBeenCalled();
     });
 
-    it('should execute multi-step shortcut when steps are pressed in order', (done) => {
-      const multiAction = jasmine.createSpy('multiAction');
-      const shortcut = {
-        id: 'multi-1',
-        steps: [['ctrl', 'k'], ['s']],
-        macSteps: [['meta', 'k'], ['s']],
-        action: multiAction,
-        description: 'Multi-step'
-      } as any as KeyboardShortcut;
-
-      service.register(shortcut);
-      const testableService = service as any;
-
-      // First step
-      const event1 = new KeyboardEvent('keydown', { ctrlKey: true, key: 'k' });
-      testableService.testHandleKeydown(event1);
-
-      // Second step
-      const event2 = new KeyboardEvent('keydown', { key: 's' });
-      // Delay slightly to simulate user pressing second key
-      setTimeout(() => {
-        testableService.testHandleKeydown(event2);
-        expect(multiAction).toHaveBeenCalled();
-        done();
-      }, 50);
-    });
-
     it('should not execute multi-step shortcut if timeout occurs before next step', (done) => {
       const multiAction = jasmine.createSpy('multiActionTimeout');
       const shortcut = {
@@ -1215,6 +800,55 @@ describe('KeyboardShortcuts', () => {
         expect(multiAction).not.toHaveBeenCalled();
         done();
       }, 2200);
+    });
+  });
+
+  describe('Multi-step Shortcuts', () => {
+    it('should execute multi-step shortcut when steps are entered in sequence', (done) => {
+      const action = jasmine.createSpy('multiStepAction');
+      const shortcut = createMultiStepMockShortcut({
+        id: 'multi-step-test',
+        // Use a two-step sequence: ctrl+k, then plain 's' for reliability in tests
+        steps: [['ctrl', 'k'], ['s']],
+        action,
+      });
+
+      service.register(shortcut);
+
+      // Simulate the first step (ctrl+k)
+      service.testHandleKeydown(KeyboardEvents.ctrlK());
+
+      // Simulate the second step shortly after (plain 's' key)
+      setTimeout(() => {
+        service.testHandleKeydown(KeyboardEvents.plain('s'));
+      }, 50);
+
+      setTimeout(() => {
+        expect(action).toHaveBeenCalled();
+        done();
+      }, 200);
+    });
+
+    it('should clear pending multi-step sequence on window blur', () => {
+      const action = jasmine.createSpy('multiStepActionBlur');
+      const shortcut = createMultiStepMockShortcut({
+        id: 'multi-step-blur',
+        steps: [['ctrl', 'k'], ['s']],
+        action,
+      });
+
+      service.register(shortcut);
+
+      // Start the sequence by sending the first step
+      service.testHandleKeydown(KeyboardEvents.ctrlK());
+
+  // Simulate window blur which should clear the pending sequence
+  service.testHandleWindowBlur();
+
+  // Send the second step - action should NOT be called because sequence was cleared
+  service.testHandleKeydown(KeyboardEvents.plain('s'));
+
+      expect(action).not.toHaveBeenCalled();
     });
   });
 

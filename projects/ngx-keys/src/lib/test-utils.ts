@@ -46,6 +46,9 @@ export class TestableKeyboardShortcuts extends KeyboardShortcuts {
     (this as any).isListening = false;
   }
 
+  // Expose protected blur/visibility handlers for tests
+  public testHandleWindowBlur = this.handleWindowBlur.bind(this);
+
   // Make protected methods public for testing
   public testHandleKeydown = this.handleKeydown.bind(this);
   public testGetPressedKeys = (event: KeyboardEvent) => this.getPressedKeys(event);
