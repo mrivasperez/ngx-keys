@@ -1,3 +1,4 @@
+import { Injectable } from '@angular/core';
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { KeyboardShortcut } from './keyboard-shortcut.interface';
 import { Observable, of } from 'rxjs';
@@ -38,6 +39,7 @@ export interface MockShortcutConfig {
 /**
  * Creates a testable KeyboardShortcuts service instance with exposed protected methods
  */
+@Injectable()
 export class TestableKeyboardShortcuts extends KeyboardShortcuts {
   constructor() {
     super();
@@ -233,6 +235,7 @@ export function createFakeDestroyRef(): FakeDestroyRef {
 /**
  * Test service that extends KeyboardShortcuts to override activeUntil handling
  */
+@Injectable()
 export class TestKeyboardShortcutsWithFakeDestruct extends KeyboardShortcuts {
   public fakeDestroyRef = createFakeDestroyRef();
 
@@ -245,6 +248,31 @@ export class TestKeyboardShortcutsWithFakeDestruct extends KeyboardShortcuts {
   protected override setupActiveUntil(activeUntil: any, unregister: () => void): void {
     if (activeUntil === 'destruct') {
       this.fakeDestroyRef.onDestroy(unregister);
+      return;
+    }
+    return super.setupActiveUntil(activeUntil, unregister);
+  }
+}
+
+@Injectable()
+export class DestructGroupService extends KeyboardShortcuts {
+  public fakeRef = {
+    cb: null as (() => void) | null,
+    onDestroy(fn: () => void) {
+      this.cb = fn;
+    },
+    trigger() {
+      if (this.cb) this.cb();
+    },
+  };
+  constructor() {
+    super();
+    (this as any).isBrowser = true;
+    (this as any).isListening = false;
+  }
+  protected override setupActiveUntil(activeUntil: any, unregister: () => void) {
+    if (activeUntil === 'destruct') {
+      this.fakeRef.onDestroy(unregister);
       return;
     }
     return super.setupActiveUntil(activeUntil, unregister);
@@ -269,6 +297,7 @@ export const TestObservables = {
 /**
  * Non-browser environment test service
  */
+@Injectable()
 export class NonBrowserKeyboardShortcuts extends KeyboardShortcuts {
   constructor() {
     super();
