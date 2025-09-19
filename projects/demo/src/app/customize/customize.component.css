@@ -1,0 +1,42 @@
+/* Layout only */
+.recording-status {
+  padding: 1rem;
+  margin: 1rem 0;
+  border: 1px solid;
+}
+
+.actions-list {
+  margin: 2rem 0;
+}
+
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1rem;
+  margin: 1rem 0;
+  gap: 1rem;
+  border: 1px solid;
+}
+
+.action-info {
+  flex: 1;
+}
+
+.action-controls {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  align-self: flex-start;
+}
+
+.instructions {
+  margin-top: 2rem;
+  padding-top: 2rem;
+}
+
+@media (max-width: 768px) {
+  .action-controls {
+    flex-direction: column;
+  }
+}

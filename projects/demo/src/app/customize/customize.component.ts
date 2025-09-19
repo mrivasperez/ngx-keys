@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef, inject, ChangeDetectionStrategy } from '@angular/core';
 import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
 import { ActionService } from '../app';
 
@@ -13,117 +13,9 @@ interface Action {
 @Component({
     selector: 'app-customize',
     imports: [],
-    template: `
-    <h2>Customize Keyboard Shortcuts</h2>
-    <p>This page lets you record custom keyboard shortcuts for different actions.</p>
-    
-    <p><strong>Last Action:</strong> {{ actionService.lastAction() }}</p>
-    <small>Total Actions: {{ actionService.count() }}</small>
-
-    @if (recordingFor) {
-      <section class="recording-status">
-        <p><strong>🔴 Recording shortcut for:</strong> {{ recordingFor.name }}</p>
-        <p><em>Press your desired key combination now...</em></p>
-        <button (click)="cancelRecording()">Cancel</button>
-      </section>
-    }
-
-    <section class="actions-list">
-      <h3>Available Actions</h3>
-      @for (action of actions; track action.id) {
-        <article class="action-item">
-          <div class="action-info">
-            <h4>{{ action.name }}</h4>
-            <p>{{ action.description }}</p>
-            <div class="current-shortcut">
-              <strong>Shortcut:</strong> 
-              <kbd>{{ formatKeys(action.keys) }}</kbd>
-            </div>
-          </div>
-          <div class="action-controls">
-            <button (click)="recordShortcut(action)" [disabled]="!!recordingFor">
-              {{ recordingFor?.id === action.id ? 'Recording...' : 'Record New' }}
-            </button>
-            <button (click)="triggerAction(action)">Test Action</button>
-          </div>
-        </article>
-      }
-    </section>
-
-    <section class="instructions">
-      <h3>How It Works</h3>
-      <ol>
-        <li>Click "Record New" next to any action</li>
-        <li>Press your desired key combination (e.g., Ctrl+K, F2, Alt+S)</li>
-        <li>The shortcut is immediately active and ready to use</li>
-        <li>Try "Test Action" to trigger actions manually</li>
-      </ol>
-      
-      <p><strong>Tip:</strong> Try combinations like Ctrl+1, Alt+H, or F5 for best results.</p>
-    </section>
-  `,
-    styles: `
-    .recording-status {
-      background: #ffe6e6;
-      border: 2px solid #ff4444;
-      padding: 1rem;
-      margin: 1rem 0;
-    }
-
-    .actions-list {
-      margin: 2rem 0;
-    }
-
-    .action-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      padding: 1rem;
-      border: 1px solid #ccc;
-      margin: 1rem 0;
-      gap: 1rem;
-    }
-
-    .action-info {
-      flex: 1;
-    }
-
-    .action-info h4 {
-      margin: 0 0 0.5rem 0;
-    }
-
-    .action-info p {
-      margin: 0 0 0.5rem 0;
-      color: #666;
-    }
-
-    .current-shortcut {
-      font-size: 0.9em;
-    }
-
-    .action-controls {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .instructions {
-      margin-top: 2rem;
-      padding-top: 2rem;
-      border-top: 1px solid #ccc;
-    }
-
-    @media (max-width: 768px) {
-      .action-item {
-        flex-direction: column;
-      }
-      
-      .action-controls {
-        flex-direction: row;
-        justify-content: center;
-      }
-    }
-  `
+    templateUrl: './customize.component.html',
+    styleUrl: './customize.component.css',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CustomizeComponent {
     private readonly keyboardService = inject(KeyboardShortcuts);
@@ -137,8 +29,8 @@ export class CustomizeComponent {
             id: 'save-document',
             name: 'Save Document',
             description: 'Save the current document or form',
-            keys: ['ctrl', 's'],
-            macKeys: ['meta', 's']
+            keys: ['ctrl', 'shift', 's'],
+            macKeys: ['meta', 'shift', 's']
         },
         {
             id: 'show-help',
@@ -155,6 +47,13 @@ export class CustomizeComponent {
             macKeys: ['meta', 'k']
         },
         {
+            id: 'chord-ca',
+            name: 'Chord C+A',
+            description: 'Demo chord: press C and A together',
+            keys: ['c', 'a'],
+            macKeys: ['c', 'a']
+        },
+        {
             id: 'refresh-data',
             name: 'Refresh Data',
             description: 'Refresh the current page data',
@@ -165,6 +64,7 @@ export class CustomizeComponent {
 
     private keydownListener: ((e: KeyboardEvent) => void) | null = null;
     private keyupListener: ((e: KeyboardEvent) => void) | null = null;
+    private groupRegistered = false;
 
     constructor() {
         // Register all actions as a group
@@ -174,12 +74,24 @@ export class CustomizeComponent {
         // Setup cleanup on destroy
         this.destroyRef.onDestroy(() => {
             this.cancelRecording();
-            // Unregister the entire group when leaving the page
-            this.keyboardService.unregisterGroup('customize-actions');
+            // Only unregister the group if it was successfully registered
+            if (this.groupRegistered) {
+                try {
+                    this.keyboardService.unregisterGroup('customize-actions');
+                } catch (error) {
+                    console.warn('Could not unregister customize actions group:', error);
+                }
+            }
         });
     }
 
     private registerAllActions() {
+        // Don't register if already registered
+        if (this.groupRegistered || this.keyboardService.isGroupRegistered('customize-actions')) {
+            console.warn('Customize actions group is already registered');
+            return;
+        }
+
         const shortcuts: KeyboardShortcut[] = this.actions.map(action => ({
             id: action.id,
             keys: action.keys,
@@ -190,8 +102,10 @@ export class CustomizeComponent {
 
         try {
             this.keyboardService.registerGroup('customize-actions', shortcuts);
+            this.groupRegistered = true;
         } catch (error) {
             console.warn('Could not register customize actions group:', error);
+            this.groupRegistered = false;
         }
     }
 
