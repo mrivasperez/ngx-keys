@@ -252,30 +252,6 @@ export class TestKeyboardShortcutsWithFakeDestruct extends KeyboardShortcuts {
   }
 }
 
-@Injectable()
-export class DestructGroupService extends KeyboardShortcuts {
-  public fakeRef = {
-    cb: null as (() => void) | null,
-    onDestroy(fn: () => void) {
-      this.cb = fn;
-    },
-    trigger() {
-      if (this.cb) this.cb();
-    },
-  };
-  constructor() {
-    super();
-    (this as any).isListening = false;
-  }
-  protected override setupActiveUntil(activeUntil: any, unregister: () => void) {
-    if (activeUntil === 'destruct') {
-      this.fakeRef.onDestroy(unregister);
-      return;
-    }
-    return super.setupActiveUntil(activeUntil, unregister);
-  }
-}
-
 /**
  * Observable helpers for testing activeUntil with observables
  */

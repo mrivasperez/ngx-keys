@@ -1,4 +1,3 @@
-import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { KeyboardShortcut } from './keyboard-shortcut.interface';
 import { KeyboardShortcutsErrors } from './keyboard-shortcuts.errors';
 import * as ngCore from '@angular/core';
@@ -12,7 +11,6 @@ import {
   TestKeyboardShortcutsWithFakeDestruct,
   TestObservables,
   createMultiStepMockShortcut,
-  DestructGroupService,
 } from './test-utils';
 import { TestBed } from '@angular/core/testing';
 
@@ -35,7 +33,6 @@ describe('KeyboardShortcuts', () => {
         ngCore.provideZonelessChangeDetection(),
         TestableKeyboardShortcuts,
         TestKeyboardShortcutsWithFakeDestruct,
-        DestructGroupService,
       ],
     });
     service = TestBed.inject(TestableKeyboardShortcuts);
@@ -336,7 +333,7 @@ describe('KeyboardShortcuts', () => {
 
       it('should unregister group when activeUntil is "destruct" by using an overridden setupActiveUntil', () => {
         const mockAction = jasmine.createSpy('mockAction');
-        const localService = TestBed.inject(DestructGroupService);
+        const localService = TestBed.inject(TestKeyboardShortcutsWithFakeDestruct);
 
         const shortcuts = [
           {
@@ -351,7 +348,7 @@ describe('KeyboardShortcuts', () => {
         localService.registerGroup('group-destruct', shortcuts, 'destruct' as any);
         expect(localService.isGroupRegistered('group-destruct')).toBe(true);
 
-        localService.fakeRef.trigger();
+        localService.fakeDestroyRef.trigger();
         expect(localService.isGroupRegistered('group-destruct')).toBe(false);
       });
 
