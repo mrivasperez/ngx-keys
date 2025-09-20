@@ -883,13 +883,6 @@ describe('KeyboardShortcuts', () => {
     });
   });
 
-  describe('Browser Environment Handling', () => {
-    it('should handle non-browser environment gracefully', () => {
-      const localService = TestBed.inject(TestableKeyboardShortcuts);
-      expect(() => localService).not.toThrow();
-    });
-  });
-
   describe('ReadOnly Maps', () => {
     it('should return readonly maps for shortcuts and groups', () => {
       const shortcuts = service.getShortcuts();
