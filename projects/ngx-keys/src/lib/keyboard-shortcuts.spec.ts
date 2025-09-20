@@ -1403,5 +1403,144 @@ describe('KeyboardShortcuts', () => {
         expect(perShortcutAction).toHaveBeenCalled();
       });
     });
+
+    describe('Group-Level Filters', () => {
+      let groupAction1: jasmine.Spy;
+      let groupAction2: jasmine.Spy;
+      let groupShortcuts: KeyboardShortcut[];
+
+      beforeEach(() => {
+        groupAction1 = jasmine.createSpy('groupAction1');
+        groupAction2 = jasmine.createSpy('groupAction2');
+        groupShortcuts = [
+          {
+            id: 'group-shortcut-1',
+            keys: ['ctrl', 'g'],
+            macKeys: ['meta', 'g'],
+            action: groupAction1,
+            description: 'Group shortcut 1'
+          },
+          {
+            id: 'group-shortcut-2',
+            keys: ['ctrl', 'h'],
+            macKeys: ['meta', 'h'],
+            action: groupAction2,
+            description: 'Group shortcut 2'
+          }
+        ];
+      });
+
+      it('should execute shortcuts when group filter returns true', () => {
+        const groupFilter = jasmine.createSpy('groupFilter').and.returnValue(true);
+        
+        service.registerGroup('test-group', groupShortcuts, { filter: groupFilter });
+        
+        const event = createKeyboardEvent({ key: 'g', ctrlKey: true });
+        service.testHandleKeydown(event);
+        
+        expect(groupFilter).toHaveBeenCalledWith(event);
+        expect(groupAction1).toHaveBeenCalled();
+      });
+
+      it('should not execute shortcuts when group filter returns false', () => {
+        const groupFilter = jasmine.createSpy('groupFilter').and.returnValue(false);
+        
+        service.registerGroup('test-group', groupShortcuts, { filter: groupFilter });
+        
+        const event = createKeyboardEvent({ key: 'g', ctrlKey: true });
+        service.testHandleKeydown(event);
+        
+        expect(groupFilter).toHaveBeenCalledWith(event);
+        expect(groupAction1).not.toHaveBeenCalled();
+      });
+
+      it('should apply group filter to all shortcuts in the group', () => {
+        const groupFilter = jasmine.createSpy('groupFilter').and.returnValue(false);
+        
+        service.registerGroup('test-group', groupShortcuts, { filter: groupFilter });
+        
+        // Test first shortcut
+        const event1 = createKeyboardEvent({ key: 'g', ctrlKey: true });
+        service.testHandleKeydown(event1);
+        expect(groupAction1).not.toHaveBeenCalled();
+        
+        // Test second shortcut
+        const event2 = createKeyboardEvent({ key: 'h', ctrlKey: true });
+        service.testHandleKeydown(event2);
+        expect(groupAction2).not.toHaveBeenCalled();
+        
+        expect(groupFilter).toHaveBeenCalledTimes(2);
+      });
+
+      it('should work with all three filter levels: global, group, and per-shortcut', () => {
+        // Add global filter that blocks divs
+        service.addFilter('divs', (event) => {
+          const target = event.target as HTMLElement;
+          return target?.tagName?.toLowerCase() !== 'div';
+        });
+
+        // Add group filter that blocks buttons  
+        const groupFilter = (event: KeyboardEvent) => {
+          const target = event.target as HTMLElement;
+          return target?.tagName?.toLowerCase() !== 'button';
+        };
+
+        // Add per-shortcut filter that blocks inputs
+        const shortcutWithFilter: KeyboardShortcut = {
+          id: 'filtered-shortcut',
+          keys: ['ctrl', 'f'],
+          macKeys: ['meta', 'f'],
+          action: jasmine.createSpy('filteredAction'),
+          filter: (event) => {
+            const target = event.target as HTMLElement;
+            return target?.tagName?.toLowerCase() !== 'input';
+          },
+          description: 'Filtered shortcut'
+        };
+
+        service.registerGroup('filtered-group', [shortcutWithFilter], { filter: groupFilter });
+
+        // Test with div (blocked by global filter)
+        const mockDiv = { tagName: 'DIV' } as HTMLElement;
+        const divEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
+        Object.defineProperty(divEvent, 'target', { value: mockDiv, configurable: true });
+        service.testHandleKeydown(divEvent);
+        expect(shortcutWithFilter.action).not.toHaveBeenCalled();
+
+        // Test with button (blocked by group filter)
+        const mockButton = { tagName: 'BUTTON' } as HTMLElement;
+        const buttonEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
+        Object.defineProperty(buttonEvent, 'target', { value: mockButton, configurable: true });
+        service.testHandleKeydown(buttonEvent);
+        expect(shortcutWithFilter.action).not.toHaveBeenCalled();
+
+        // Test with input (blocked by per-shortcut filter)
+        const mockInput = { tagName: 'INPUT' } as HTMLElement;
+        const inputEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
+        Object.defineProperty(inputEvent, 'target', { value: mockInput, configurable: true });
+        service.testHandleKeydown(inputEvent);
+        expect(shortcutWithFilter.action).not.toHaveBeenCalled();
+
+        // Test with span (allowed by all filters)
+        const mockSpan = { tagName: 'SPAN' } as HTMLElement;
+        const spanEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
+        Object.defineProperty(spanEvent, 'target', { value: mockSpan, configurable: true });
+        service.testHandleKeydown(spanEvent);
+        expect(shortcutWithFilter.action).toHaveBeenCalled();
+      });
+
+      it('should support backward compatibility with old activeUntil parameter', () => {
+        const destroyRef = jasmine.createSpyObj('DestroyRef', ['onDestroy']);
+        
+        // This should still work with the old API
+        service.registerGroup('legacy-group', groupShortcuts, destroyRef);
+        
+        const event = createKeyboardEvent({ key: 'g', ctrlKey: true });
+        service.testHandleKeydown(event);
+        
+        expect(groupAction1).toHaveBeenCalled();
+        expect(destroyRef.onDestroy).toHaveBeenCalled();
+      });
+    });
   });
 });
