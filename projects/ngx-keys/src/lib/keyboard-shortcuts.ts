@@ -1,5 +1,13 @@
-import { DestroyRef, Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
+import {
+  afterNextRender,
+  computed,
+  DestroyRef,
+  DOCUMENT,
+  inject,
+  Injectable,
+  OnDestroy,
+  signal,
+} from '@angular/core';
 import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutGroup, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
 import { Observable, take } from 'rxjs';
@@ -8,6 +16,9 @@ import { Observable, take } from 'rxjs';
   providedIn: 'root'
 })
 export class KeyboardShortcuts implements OnDestroy {
+  private readonly document = inject(DOCUMENT);
+  private readonly window = this.document.defaultView!;
+
   private readonly shortcuts = new Map<string, KeyboardShortcut>();
   private readonly groups = new Map<string, KeyboardShortcutGroup>();
   private readonly activeShortcuts = new Set<string>();
@@ -60,7 +71,6 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly blurListener = this.handleWindowBlur.bind(this);
   private readonly visibilityListener = this.handleVisibilityChange.bind(this);
   private isListening = false;
-  protected isBrowser: boolean;
   /** Default timeout (ms) for completing a multi-step sequence */
   protected sequenceTimeout = 2000;
 
@@ -72,18 +82,9 @@ export class KeyboardShortcuts implements OnDestroy {
   } | null = null;
 
   constructor() {
-    // Use try-catch to handle injection context for better testability
-    try {
-      const platformId = inject(PLATFORM_ID);
-      this.isBrowser = isPlatformBrowser(platformId);
-    } catch {
-      // Fallback for testing - assume browser environment
-      this.isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
-    }
-
-    if (this.isBrowser) {
+    afterNextRender(() => {
       this.startListening();
-    }
+    });
   }
 
   ngOnDestroy(): void {
@@ -426,31 +427,31 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   private startListening(): void {
-    if (!this.isBrowser || this.isListening) {
+    if (this.isListening) {
       return;
     }
     
     // Listen to both keydown and keyup so we can maintain a Set of currently
     // pressed physical keys. We avoid passive:true because we may call
     // preventDefault() when matching shortcuts.
-    document.addEventListener('keydown', this.keydownListener, { passive: false });
-    document.addEventListener('keyup', this.keyupListener, { passive: false });
+    this.document.addEventListener('keydown', this.keydownListener, { passive: false });
+    this.document.addEventListener('keyup', this.keyupListener, { passive: false });
     // Listen for blur/visibility changes so we can clear the currently-down keys
     // and avoid stale state when the browser or tab loses focus.
-    window.addEventListener('blur', this.blurListener);
-    document.addEventListener('visibilitychange', this.visibilityListener);
+    this.window.addEventListener('blur', this.blurListener);
+    this.document.addEventListener('visibilitychange', this.visibilityListener);
     this.isListening = true;
   }
 
   private stopListening(): void {
-    if (!this.isBrowser || !this.isListening) {
+    if (!this.isListening) {
       return;
     }
     
-    document.removeEventListener('keydown', this.keydownListener);
-    document.removeEventListener('keyup', this.keyupListener);
-    window.removeEventListener('blur', this.blurListener);
-    document.removeEventListener('visibilitychange', this.visibilityListener);
+    this.document.removeEventListener('keydown', this.keydownListener);
+    this.document.removeEventListener('keyup', this.keyupListener);
+    this.window.removeEventListener('blur', this.blurListener);
+    this.document.removeEventListener('visibilitychange', this.visibilityListener);
     this.isListening = false;
   }
 
@@ -579,7 +580,7 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   protected handleVisibilityChange(): void {
-    if (document.visibilityState === 'hidden') {
+    if (this.document.visibilityState === 'hidden') {
       // When the document becomes hidden, clear both pressed keys and any
       // pending multi-step sequence. This prevents sequences from remaining
       // active when the user switches tabs or minimizes the window.
@@ -627,11 +628,6 @@ export class KeyboardShortcuts implements OnDestroy {
     }
   }
 
-  /**
-   * Build the pressed keys array used for matching against registered shortcuts.
-   * If multiple non-modifier keys are currently down, include them (chord support).
-   * Otherwise fall back to single main-key detection from the event for compatibility.
-   */
   /**
    * Build the pressed keys set used for matching against registered shortcuts.
    * If multiple non-modifier keys are currently down, include them (chord support).
@@ -731,7 +727,7 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   protected isMacPlatform(): boolean {
-    return this.isBrowser && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+    return /Mac|iPod|iPhone|iPad/.test(this.window.navigator.platform ?? '');
   }
   
   protected setupActiveUntil (activeUntil: KeyboardShortcutActiveUntil|undefined, unregister: () => void) {

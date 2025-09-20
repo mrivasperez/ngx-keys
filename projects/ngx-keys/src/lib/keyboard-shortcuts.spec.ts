@@ -11,10 +11,10 @@ import {
   KeyboardEvents,
   TestKeyboardShortcutsWithFakeDestruct,
   TestObservables,
-  NonBrowserKeyboardShortcuts,
   createMultiStepMockShortcut,
-  createStepEvent
+  DestructGroupService,
 } from './test-utils';
+import { TestBed } from '@angular/core/testing';
 
 describe('KeyboardShortcuts', () => {
   let service: TestableKeyboardShortcuts;
@@ -30,7 +30,15 @@ describe('KeyboardShortcuts', () => {
   };
 
   beforeEach(() => {
-    service = new TestableKeyboardShortcuts();
+    TestBed.configureTestingModule({
+      providers: [
+        ngCore.provideZonelessChangeDetection(),
+        TestableKeyboardShortcuts,
+        TestKeyboardShortcutsWithFakeDestruct,
+        DestructGroupService,
+      ],
+    });
+    service = TestBed.inject(TestableKeyboardShortcuts);
     mockAction = jasmine.createSpy('mockAction');
   });
 
@@ -160,7 +168,7 @@ describe('KeyboardShortcuts', () => {
 
       it('should unregister when activeUntil is "destruct" by using an overridden setupActiveUntil', () => {
         const mockAction = jasmine.createSpy('mockAction');
-        const localService = new TestKeyboardShortcutsWithFakeDestruct();
+        const localService = TestBed.inject(TestKeyboardShortcutsWithFakeDestruct);
 
         const shortcut = createMockShortcut({
           id: 'destruct-test',
@@ -328,20 +336,7 @@ describe('KeyboardShortcuts', () => {
 
       it('should unregister group when activeUntil is "destruct" by using an overridden setupActiveUntil', () => {
         const mockAction = jasmine.createSpy('mockAction');
-
-        class DestructGroupService extends KeyboardShortcuts {
-          public fakeRef = { cb: null as (() => void) | null, onDestroy(fn: () => void) { this.cb = fn }, trigger() { if (this.cb) this.cb(); } };
-          constructor() { super(); (this as any).isBrowser = true; (this as any).isListening = false; }
-          protected override setupActiveUntil(activeUntil: any, unregister: () => void) {
-            if (activeUntil === 'destruct') {
-              this.fakeRef.onDestroy(unregister);
-              return;
-            }
-            return super.setupActiveUntil(activeUntil, unregister);
-          }
-        }
-
-        const localService = new DestructGroupService();
+        const localService = TestBed.inject(DestructGroupService);
 
         const shortcuts = [
           {
@@ -733,7 +728,7 @@ describe('KeyboardShortcuts', () => {
       });
       service.register(shortcut);
 
-      // Mock both the platform detection AND isBrowser check
+      // Mock the platform detection check
       spyOn(service, 'testIsMacPlatform').and.returnValue(true);
       // Override the isMacPlatform method call in handleKeydown
       spyOn(service as any, 'isMacPlatform').and.returnValue(true);
@@ -893,7 +888,8 @@ describe('KeyboardShortcuts', () => {
 
   describe('Browser Environment Handling', () => {
     it('should handle non-browser environment gracefully', () => {
-      expect(() => new NonBrowserKeyboardShortcuts()).not.toThrow();
+      const localService = TestBed.inject(TestableKeyboardShortcuts);
+      expect(() => localService).not.toThrow();
     });
   });
 
