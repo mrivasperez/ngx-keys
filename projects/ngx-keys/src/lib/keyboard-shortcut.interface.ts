@@ -80,8 +80,7 @@ export interface KeyboardShortcutGroup {
  *   const tagName = target?.tagName?.toLowerCase();
  *   return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
  * };
- * 
- * keyboardService.setFilter(inputFilter);
+ * // keyboardService.addFilter('forms', inputFilter);
  * ```
  */
 export type KeyboardShortcutFilter = (event: KeyboardEvent) => boolean;

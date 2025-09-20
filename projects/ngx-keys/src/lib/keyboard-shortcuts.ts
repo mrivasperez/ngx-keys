@@ -24,6 +24,8 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly activeShortcuts = new Set<string>();
   private readonly activeGroups = new Set<string>();
   private readonly currentlyDownKeys = new Set<string>();
+  // O(1) lookup from shortcutId to its groupId to avoid scanning all groups per event
+  private readonly shortcutToGroup = new Map<string, string>();
 
   /**
    * Named global filters that apply to all shortcuts.
@@ -302,6 +304,7 @@ export class KeyboardShortcuts implements OnDestroy {
       shortcuts.forEach(shortcut => {
         this.shortcuts.set(shortcut.id, shortcut);
         this.activeShortcuts.add(shortcut.id);
+        this.shortcutToGroup.set(shortcut.id, groupId);
       });
     });
 
@@ -322,6 +325,7 @@ export class KeyboardShortcuts implements OnDestroy {
 
     this.shortcuts.delete(shortcutId);
     this.activeShortcuts.delete(shortcutId);
+    this.shortcutToGroup.delete(shortcutId);
     this.updateState();
   }
 
@@ -339,6 +343,7 @@ export class KeyboardShortcuts implements OnDestroy {
       group.shortcuts.forEach(shortcut => {
         this.shortcuts.delete(shortcut.id);
         this.activeShortcuts.delete(shortcut.id);
+        this.shortcutToGroup.delete(shortcut.id);
       });
       this.groups.delete(groupId);
       this.activeGroups.delete(groupId);
@@ -530,12 +535,8 @@ export class KeyboardShortcuts implements OnDestroy {
    * @returns The group containing the shortcut, or undefined if not found in any group
    */
   private findGroupForShortcut(shortcutId: string): KeyboardShortcutGroup | undefined {
-    for (const group of this.groups.values()) {
-      if (group.shortcuts.some(s => s.id === shortcutId)) {
-        return group;
-      }
-    }
-    return undefined;
+    const groupId = this.shortcutToGroup.get(shortcutId);
+    return groupId ? this.groups.get(groupId) : undefined;
   }
 
   /**
@@ -548,6 +549,8 @@ export class KeyboardShortcuts implements OnDestroy {
    */
   private shouldProcessEvent(event: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
     // First, check all global filters - ALL must return true
+    // Note: handleKeydown pre-checks these once per event for early exit,
+    // but we keep this for direct calls and completeness.
     for (const globalFilter of this.globalFilters.values()) {
       if (!globalFilter(event)) {
         return false;
@@ -601,13 +604,36 @@ export class KeyboardShortcuts implements OnDestroy {
     // Update the currently down keys with this event's key
     this.updateCurrentlyDownKeysOnKeydown(event);
 
+    // Fast path: if any global filter blocks this event, bail out before
+    // scanning all active shortcuts. This drastically reduces per-event work
+    // when filters are commonly blocking (e.g., while typing in inputs).
+    if (this.globalFilters.size > 0) {
+      for (const f of this.globalFilters.values()) {
+        if (!f(event)) {
+          // Also clear any pending multi-step sequence – entering a globally
+          // filtered context should not allow sequences to continue.
+          this.clearPendingSequence();
+          return;
+        }
+      }
+    }
+
     const isMac = this.isMacPlatform();
+
+    // Evaluate active group-level filters once per event and cache blocked groups
+    const blockedGroups = this.precomputeBlockedGroups(event);
 
     // If there is a pending multi-step sequence, try to advance it first
     if (this.pendingSequence) {
       const pending = this.pendingSequence;
       const shortcut = this.shortcuts.get(pending.shortcutId);
       if (shortcut) {
+        // If the pending shortcut belongs to a blocked group, cancel sequence
+        const g = this.findGroupForShortcut(shortcut.id);
+        if (g && blockedGroups.has(g.id)) {
+          this.clearPendingSequence();
+          return;
+        }
         const steps = isMac
           ? (shortcut.macSteps ?? shortcut.macKeys ?? shortcut.steps ?? shortcut.keys ?? [])
           : (shortcut.steps ?? shortcut.keys ?? shortcut.macSteps ?? shortcut.macKeys ?? []);
@@ -662,6 +688,12 @@ export class KeyboardShortcuts implements OnDestroy {
     for (const shortcutId of this.activeShortcuts) {
       const shortcut = this.shortcuts.get(shortcutId);
       if (!shortcut) continue;
+
+      // Skip expensive matching entirely when the shortcut's group is blocked
+      const g = this.findGroupForShortcut(shortcut.id);
+      if (g && blockedGroups.has(g.id)) {
+        continue;
+      }
 
       const steps = isMac
         ? (shortcut.macSteps ?? shortcut.macKeys ?? shortcut.steps ?? shortcut.keys ?? [])
@@ -909,5 +941,20 @@ export class KeyboardShortcuts implements OnDestroy {
       activeUntil.pipe(take(1)).subscribe(unregister);
       return
     }
+  }
+
+  /**
+   * Evaluate group filters once per event and return the set of blocked group IDs.
+   */
+  protected precomputeBlockedGroups(event: KeyboardEvent): Set<string> {
+    const blocked = new Set<string>();
+    if (this.activeGroups.size === 0) return blocked;
+    for (const groupId of this.activeGroups) {
+      const group = this.groups.get(groupId);
+      if (group && group.filter && !group.filter(event)) {
+        blocked.add(groupId);
+      }
+    }
+    return blocked;
   }
 }

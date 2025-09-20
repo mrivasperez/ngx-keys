@@ -534,6 +534,31 @@ You can configure which keyboard events should be processed by setting a filter 
 > [!NOTE]
 > **No Default Filtering**: ngx-keys processes ALL keyboard events by default. This gives you maximum flexibility - some apps want shortcuts to work everywhere, others want to exclude form inputs. You decide!
 
+#### Named filters (recommended)
+
+For efficiency and control, prefer named global filters. You can toggle them on/off without replacing others, and ngx-keys evaluates them only once per keydown event (fast path), short‑circuiting further work when blocked.
+
+```typescript
+// Add named filters
+keyboardService.addFilter('forms', (event) => {
+  const t = event.target as HTMLElement | null;
+  const tag = t?.tagName?.toLowerCase();
+  return !(['input', 'textarea', 'select'].includes(tag ?? '')) && !t?.isContentEditable;
+});
+
+keyboardService.addFilter('modal-scope', (event) => {
+  const t = event.target as HTMLElement | null;
+  return !!t?.closest('.modal');
+});
+
+// Remove/toggle when context changes
+keyboardService.removeFilter('modal-scope');
+
+// Inspect and manage
+keyboardService.getFilterNames(); // ['forms']
+keyboardService.clearFilters();   // remove all
+```
+
 ```typescript
 import { Component, inject } from '@angular/core';
 import { KeyboardShortcuts, KeyboardShortcutFilter } from 'ngx-keys';
@@ -559,13 +584,11 @@ export class FilterExampleComponent {
     const inputFilter: KeyboardShortcutFilter = (event) => {
       const target = event.target as HTMLElement;
       const tagName = target?.tagName?.toLowerCase();
-      
-      // Return false to ignore the event, true to process it
-      return !['input', 'textarea', 'select'].includes(tagName) && 
-             !target?.isContentEditable;
+      return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
     };
 
-    this.keyboardService.setFilter(inputFilter);
+    // Use named filter for toggling
+    this.keyboardService.addFilter('forms', inputFilter);
   }
 
   private save() {
@@ -584,7 +607,7 @@ const formFilter: KeyboardShortcutFilter = (event) => {
   return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
 };
 
-keyboardService.setFilter(formFilter);
+keyboardService.addFilter('forms', formFilter);
 ```
 
 **Ignore elements with specific attributes:**
@@ -594,7 +617,7 @@ const attributeFilter: KeyboardShortcutFilter = (event) => {
   return !target?.hasAttribute('data-no-shortcuts');
 };
 
-keyboardService.setFilter(attributeFilter);
+keyboardService.addFilter('no-shortcuts-attr', attributeFilter);
 ```
 
 **Complex conditional filtering:**
@@ -615,13 +638,15 @@ const conditionalFilter: KeyboardShortcutFilter = (event) => {
   return true;
 };
 
-keyboardService.setFilter(conditionalFilter);
+keyboardService.addFilter('conditional', conditionalFilter);
 ```
 
 **Remove filtering:**
 ```typescript
-// Remove any existing filter to process all events
-keyboardService.setFilter(null);
+// Remove a specific named filter
+keyboardService.removeFilter('forms');
+// Or remove all
+keyboardService.clearFilters();
 ```
 
 #### Example: Modal Context Filtering
@@ -630,7 +655,7 @@ keyboardService.setFilter(null);
 export class ModalComponent {
   constructor() {
     // When modal opens, only allow modal-specific shortcuts
-    this.keyboardService.setFilter((event) => {
+    this.keyboardService.addFilter('modal-scope', (event) => {
       const target = event.target as HTMLElement;
       
       // Only process events within the modal
@@ -640,10 +665,18 @@ export class ModalComponent {
 
   onClose() {
     // Restore normal filtering when modal closes
-    this.keyboardService.setFilter(this.getDefaultFilter());
+    this.keyboardService.removeFilter('modal-scope');
   }
 }
 ```
+
+#### Performance tips
+
+- Filters are evaluated once per keydown before scanning shortcuts. If any global filter returns false, ngx-keys exits early and clears pending sequences.
+- Group-level filters are precomputed once per event; shortcuts in blocked groups are skipped without key matching.
+- Keep filters cheap and synchronous. Prefer reading event.target properties (tagName, isContentEditable, classList) over layout-triggering queries.
+- Use named filters to toggle contexts (modals, editors) without allocating new closures per interaction.
+- Avoid complex DOM traversals inside filters; if needed, memoize simple queries or use attributes (e.g., data-no-shortcuts).
 
 ## Building
 
