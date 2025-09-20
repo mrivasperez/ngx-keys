@@ -1081,4 +1081,208 @@ describe('KeyboardShortcuts', () => {
       });
     });
   });
+
+  describe('Filter Functionality', () => {
+    let mockAction: jasmine.Spy;
+    let testShortcut: KeyboardShortcut;
+
+    beforeEach(() => {
+      mockAction = jasmine.createSpy('mockAction');
+      testShortcut = {
+        id: 'test-filter',
+        keys: ['ctrl', 's'],
+        macKeys: ['meta', 's'],
+        action: mockAction,
+        description: 'Test shortcut for filter'
+      };
+      service.register(testShortcut);
+    });
+
+    describe('setFilter', () => {
+      it('should set and get filter function', () => {
+        const filterFn = (event: KeyboardEvent) => true;
+        
+        expect(service.getFilter()).toBeNull();
+        
+        service.setFilter(filterFn);
+        
+        expect(service.getFilter()).toBe(filterFn);
+      });
+
+      it('should allow setting filter to null', () => {
+        const filterFn = (event: KeyboardEvent) => true;
+        service.setFilter(filterFn);
+        
+        expect(service.getFilter()).toBe(filterFn);
+        
+        service.setFilter(null);
+        
+        expect(service.getFilter()).toBeNull();
+      });
+    });
+
+    describe('Event filtering', () => {
+      it('should execute shortcut when no filter is set', () => {
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+        
+        service.testHandleKeydown(event);
+        
+        expect(mockAction).toHaveBeenCalled();
+      });
+
+      it('should execute shortcut when filter returns true', () => {
+        service.setFilter(() => true);
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+        
+        service.testHandleKeydown(event);
+        
+        expect(mockAction).toHaveBeenCalled();
+      });
+
+      it('should not execute shortcut when filter returns false', () => {
+        service.setFilter(() => false);
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+        
+        service.testHandleKeydown(event);
+        
+        expect(mockAction).not.toHaveBeenCalled();
+      });
+
+      it('should pass the keyboard event to the filter function', () => {
+        const filterSpy = jasmine.createSpy('filter').and.returnValue(true);
+        service.setFilter(filterSpy);
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+        
+        service.testHandleKeydown(event);
+        
+        expect(filterSpy).toHaveBeenCalledWith(event);
+      });
+
+      it('should work with input element filtering', () => {
+        // Create mock input element
+        const mockInput = {
+          tagName: 'INPUT',
+          isContentEditable: false
+        } as HTMLElement;
+
+        const inputFilter = (event: KeyboardEvent) => {
+          const target = event.target as HTMLElement;
+          const tagName = target?.tagName?.toLowerCase();
+          return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
+        };
+
+        service.setFilter(inputFilter);
+
+        // Test with input element - should be filtered out
+        const inputEvent = createKeyboardEvent({ key: 's', ctrlKey: true });
+        // Mock the target property
+        Object.defineProperty(inputEvent, 'target', { value: mockInput, configurable: true });
+        
+        service.testHandleKeydown(inputEvent);
+        expect(mockAction).not.toHaveBeenCalled();
+
+        // Reset spy for next test
+        mockAction.calls.reset();
+
+        // Test with div element - should work
+        const mockDiv = {
+          tagName: 'DIV',
+          isContentEditable: false
+        } as HTMLElement;
+
+        const divEvent = createKeyboardEvent({ key: 's', ctrlKey: true });
+        Object.defineProperty(divEvent, 'target', { value: mockDiv, configurable: true });
+        
+        service.testHandleKeydown(divEvent);
+        expect(mockAction).toHaveBeenCalled();
+      });
+
+      it('should work with contenteditable filtering', () => {
+        const mockEditableDiv = {
+          tagName: 'DIV',
+          isContentEditable: true
+        } as HTMLElement;
+
+        const editableFilter = (event: KeyboardEvent) => {
+          const target = event.target as HTMLElement;
+          return !target?.isContentEditable;
+        };
+
+        service.setFilter(editableFilter);
+
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+        Object.defineProperty(event, 'target', { value: mockEditableDiv, configurable: true });
+        
+        service.testHandleKeydown(event);
+        
+        expect(mockAction).not.toHaveBeenCalled();
+      });
+
+      it('should allow filter function to change dynamically', () => {
+        // Start with permissive filter
+        service.setFilter(() => true);
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+        
+        service.testHandleKeydown(event);
+        expect(mockAction).toHaveBeenCalledTimes(1);
+
+        // Change to restrictive filter
+        service.setFilter(() => false);
+        
+        service.testHandleKeydown(event);
+        expect(mockAction).toHaveBeenCalledTimes(1); // Should not increase
+
+        // Remove filter
+        service.setFilter(null);
+        
+        service.testHandleKeydown(event);
+        expect(mockAction).toHaveBeenCalledTimes(2); // Should increase
+      });
+    });
+
+    describe('Filter with multi-step shortcuts', () => {
+      let multiStepAction: jasmine.Spy;
+      let multiStepShortcut: KeyboardShortcut;
+
+      beforeEach(() => {
+        multiStepAction = jasmine.createSpy('multiStepAction');
+        multiStepShortcut = {
+          id: 'multi-step-filter',
+          steps: [['ctrl', 'k'], ['s']],
+          macSteps: [['meta', 'k'], ['s']],
+          action: multiStepAction,
+          description: 'Multi-step shortcut for filter testing'
+        };
+        service.register(multiStepShortcut);
+      });
+
+      it('should apply filter to multi-step shortcuts', () => {
+        service.setFilter(() => false);
+        
+        // Try to start sequence - should be blocked by filter
+        const firstStepEvent = createKeyboardEvent({ key: 'k', ctrlKey: true });
+        service.testHandleKeydown(firstStepEvent);
+        
+        // Try second step
+        const secondStepEvent = createKeyboardEvent({ key: 's' });
+        service.testHandleKeydown(secondStepEvent);
+        
+        expect(multiStepAction).not.toHaveBeenCalled();
+      });
+
+      it('should allow multi-step shortcuts when filter permits', () => {
+        service.setFilter(() => true);
+        
+        // Start sequence
+        const firstStepEvent = createKeyboardEvent({ key: 'k', ctrlKey: true });
+        service.testHandleKeydown(firstStepEvent);
+        
+        // Complete sequence
+        const secondStepEvent = createKeyboardEvent({ key: 's' });
+        service.testHandleKeydown(secondStepEvent);
+        
+        expect(multiStepAction).toHaveBeenCalled();
+      });
+    });
+  });
 });
