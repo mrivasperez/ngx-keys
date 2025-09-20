@@ -11,7 +11,6 @@ import {
   KeyboardEvents,
   TestKeyboardShortcutsWithFakeDestruct,
   TestObservables,
-  NonBrowserKeyboardShortcuts,
   createMultiStepMockShortcut,
   DestructGroupService,
 } from './test-utils';
@@ -35,7 +34,6 @@ describe('KeyboardShortcuts', () => {
       providers: [
         ngCore.provideZonelessChangeDetection(),
         TestableKeyboardShortcuts,
-        NonBrowserKeyboardShortcuts,
         TestKeyboardShortcutsWithFakeDestruct,
         DestructGroupService,
       ],
@@ -730,7 +728,7 @@ describe('KeyboardShortcuts', () => {
       });
       service.register(shortcut);
 
-      // Mock both the platform detection AND isBrowser check
+      // Mock the platform detection check
       spyOn(service, 'testIsMacPlatform').and.returnValue(true);
       // Override the isMacPlatform method call in handleKeydown
       spyOn(service as any, 'isMacPlatform').and.returnValue(true);
@@ -890,7 +888,7 @@ describe('KeyboardShortcuts', () => {
 
   describe('Browser Environment Handling', () => {
     it('should handle non-browser environment gracefully', () => {
-      const localService = TestBed.inject(NonBrowserKeyboardShortcuts);
+      const localService = TestBed.inject(TestableKeyboardShortcuts);
       expect(() => localService).not.toThrow();
     });
   });

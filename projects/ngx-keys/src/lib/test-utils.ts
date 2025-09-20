@@ -44,7 +44,6 @@ export class TestableKeyboardShortcuts extends KeyboardShortcuts {
   constructor() {
     super();
     // Override platform detection for testing
-    (this as any).isBrowser = true;
     (this as any).isListening = false;
   }
 
@@ -241,7 +240,6 @@ export class TestKeyboardShortcutsWithFakeDestruct extends KeyboardShortcuts {
 
   constructor() {
     super();
-    (this as any).isBrowser = true;
     (this as any).isListening = false;
   }
 
@@ -267,7 +265,6 @@ export class DestructGroupService extends KeyboardShortcuts {
   };
   constructor() {
     super();
-    (this as any).isBrowser = true;
     (this as any).isListening = false;
   }
   protected override setupActiveUntil(activeUntil: any, unregister: () => void) {
@@ -293,14 +290,3 @@ export const TestObservables = {
    */
   immediateTrigger: (): Observable<boolean> => of(true)
 };
-
-/**
- * Non-browser environment test service
- */
-@Injectable()
-export class NonBrowserKeyboardShortcuts extends KeyboardShortcuts {
-  constructor() {
-    super();
-    (this as any).isBrowser = false;
-  }
-}

@@ -1,14 +1,13 @@
 import {
+  afterNextRender,
   computed,
   DestroyRef,
   DOCUMENT,
   inject,
   Injectable,
   OnDestroy,
-  PLATFORM_ID,
   signal,
 } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
 import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutGroup, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
 import { Observable, take } from 'rxjs';
@@ -72,7 +71,6 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly blurListener = this.handleWindowBlur.bind(this);
   private readonly visibilityListener = this.handleVisibilityChange.bind(this);
   private isListening = false;
-  protected isBrowser: boolean;
   /** Default timeout (ms) for completing a multi-step sequence */
   protected sequenceTimeout = 2000;
 
@@ -84,18 +82,9 @@ export class KeyboardShortcuts implements OnDestroy {
   } | null = null;
 
   constructor() {
-    // Use try-catch to handle injection context for better testability
-    try {
-      const platformId = inject(PLATFORM_ID);
-      this.isBrowser = isPlatformBrowser(platformId);
-    } catch {
-      // Fallback for testing, use `window` & `document` directly - assume browser environment
-      this.isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
-    }
-
-    if (this.isBrowser) {
+    afterNextRender(() => {
       this.startListening();
-    }
+    });
   }
 
   ngOnDestroy(): void {
@@ -438,7 +427,7 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   private startListening(): void {
-    if (!this.isBrowser || this.isListening) {
+    if (this.isListening) {
       return;
     }
     
@@ -455,7 +444,7 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   private stopListening(): void {
-    if (!this.isBrowser || !this.isListening) {
+    if (!this.isListening) {
       return;
     }
     
@@ -738,7 +727,7 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   protected isMacPlatform(): boolean {
-    return this.isBrowser && /Mac|iPod|iPhone|iPad/.test(this.window.navigator.platform ?? '');
+    return /Mac|iPod|iPhone|iPad/.test(this.window.navigator.platform ?? '');
   }
   
   protected setupActiveUntil (activeUntil: KeyboardShortcutActiveUntil|undefined, unregister: () => void) {
