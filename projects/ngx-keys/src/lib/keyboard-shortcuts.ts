@@ -8,7 +8,7 @@ import {
   OnDestroy,
   signal,
 } from '@angular/core';
-import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutGroup, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
+import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutFilter, KeyboardShortcutGroup, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
 import { Observable, take } from 'rxjs';
 
@@ -24,6 +24,12 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly activeShortcuts = new Set<string>();
   private readonly activeGroups = new Set<string>();
   private readonly currentlyDownKeys = new Set<string>();
+  
+  /**
+   * Optional filter function to determine which keyboard events should be processed.
+   * If not set, all events are processed. If set, only events where filter returns `true` are processed.
+   */
+  private filterFunction: KeyboardShortcutFilter | null = null;
   
   // Single consolidated state signal - reduces memory overhead
   private readonly state = signal({
@@ -426,6 +432,38 @@ export class KeyboardShortcuts implements OnDestroy {
     return this.groups;
   }
 
+  /**
+   * Set a filter function to determine which keyboard events should be processed.
+   * The filter function receives a KeyboardEvent and should return `true` to allow
+   * shortcuts to be triggered, or `false` to ignore the event.
+   * 
+   * @param filter - Function that returns `true` to process events, `false` to ignore them.
+   *                 Pass `null` to remove any existing filter.
+   * 
+   * @example
+   * ```typescript
+   * // Ignore shortcuts when typing in form elements
+   * keyboardService.setFilter((event) => {
+   *   const target = event.target as HTMLElement;
+   *   const tagName = target?.tagName?.toLowerCase();
+   *   return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
+   * });
+   * 
+   * // Remove filter to allow all events
+   * keyboardService.setFilter(null);
+   * ```
+   */
+  setFilter(filter: KeyboardShortcutFilter | null): void {
+    this.filterFunction = filter;
+  }
+
+  /**
+   * Get the current filter function, or null if no filter is set.
+   */
+  getFilter(): KeyboardShortcutFilter | null {
+    return this.filterFunction;
+  }
+
   private startListening(): void {
     if (this.isListening) {
       return;
@@ -456,6 +494,11 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   protected handleKeydown(event: KeyboardEvent): void {
+    // Apply filter if one is set - if filter returns false, ignore this event
+    if (this.filterFunction && !this.filterFunction(event)) {
+      return;
+    }
+
     // Update the currently down keys with this event's key
     this.updateCurrentlyDownKeysOnKeydown(event);
 

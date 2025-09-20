@@ -27,6 +27,27 @@ export interface KeyboardShortcutGroup {
 }
 
 /**
+ * Filter function type for determining whether a keyboard event should be processed.
+ * Return `true` to process the event (allow shortcuts), `false` to ignore it.
+ * 
+ * @param event - The keyboard event to evaluate
+ * @returns `true` to allow shortcuts, `false` to ignore the event
+ * 
+ * @example
+ * ```typescript
+ * // Ignore shortcuts when typing in form elements
+ * const inputFilter: KeyboardShortcutFilter = (event) => {
+ *   const target = event.target as HTMLElement;
+ *   const tagName = target?.tagName?.toLowerCase();
+ *   return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
+ * };
+ * 
+ * keyboardService.setFilter(inputFilter);
+ * ```
+ */
+export type KeyboardShortcutFilter = (event: KeyboardEvent) => boolean;
+
+/**
  * Interface for keyboard shortcut data optimized for UI display
  */
 export interface KeyboardShortcutUI {
