@@ -527,6 +527,124 @@ this.keyboardService.register({
 });
 ```
 
+### Event Filtering
+
+You can configure which keyboard events should be processed by setting a filter function. This is useful for ignoring shortcuts when users are typing in input fields, text areas, or other form elements.
+
+> [!NOTE]
+> **No Default Filtering**: ngx-keys processes ALL keyboard events by default. This gives you maximum flexibility - some apps want shortcuts to work everywhere, others want to exclude form inputs. You decide!
+
+```typescript
+import { Component, inject } from '@angular/core';
+import { KeyboardShortcuts, KeyboardShortcutFilter } from 'ngx-keys';
+
+export class FilterExampleComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+
+  constructor() {
+    // Set up shortcuts
+    this.keyboardService.register({
+      id: 'save',
+      keys: ['ctrl', 's'],
+      macKeys: ['meta', 's'],
+      action: () => this.save(),
+      description: 'Save document'
+    });
+
+    // Configure filtering to ignore form elements
+    this.setupInputFiltering();
+  }
+
+  private setupInputFiltering() {
+    const inputFilter: KeyboardShortcutFilter = (event) => {
+      const target = event.target as HTMLElement;
+      const tagName = target?.tagName?.toLowerCase();
+      
+      // Return false to ignore the event, true to process it
+      return !['input', 'textarea', 'select'].includes(tagName) && 
+             !target?.isContentEditable;
+    };
+
+    this.keyboardService.setFilter(inputFilter);
+  }
+
+  private save() {
+    console.log('Document saved!');
+  }
+}
+```
+
+#### Common Filter Patterns
+
+**Ignore form elements:**
+```typescript
+const formFilter: KeyboardShortcutFilter = (event) => {
+  const target = event.target as HTMLElement;
+  const tagName = target?.tagName?.toLowerCase();
+  return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
+};
+
+keyboardService.setFilter(formFilter);
+```
+
+**Ignore elements with specific attributes:**
+```typescript
+const attributeFilter: KeyboardShortcutFilter = (event) => {
+  const target = event.target as HTMLElement;
+  return !target?.hasAttribute('data-no-shortcuts');
+};
+
+keyboardService.setFilter(attributeFilter);
+```
+
+**Complex conditional filtering:**
+```typescript
+const conditionalFilter: KeyboardShortcutFilter = (event) => {
+  const target = event.target as HTMLElement;
+  
+  // Allow shortcuts in code editors (even though they're contentEditable)
+  if (target?.classList?.contains('code-editor')) {
+    return true;
+  }
+  
+  // Block shortcuts in form elements
+  if (target?.tagName?.match(/INPUT|TEXTAREA|SELECT/i) || target?.isContentEditable) {
+    return false;
+  }
+  
+  return true;
+};
+
+keyboardService.setFilter(conditionalFilter);
+```
+
+**Remove filtering:**
+```typescript
+// Remove any existing filter to process all events
+keyboardService.setFilter(null);
+```
+
+#### Example: Modal Context Filtering
+
+```typescript
+export class ModalComponent {
+  constructor() {
+    // When modal opens, only allow modal-specific shortcuts
+    this.keyboardService.setFilter((event) => {
+      const target = event.target as HTMLElement;
+      
+      // Only process events within the modal
+      return target?.closest('.modal') !== null;
+    });
+  }
+
+  onClose() {
+    // Restore normal filtering when modal closes
+    this.keyboardService.setFilter(this.getDefaultFilter());
+  }
+}
+```
+
 ## Building
 
 To build the library:
