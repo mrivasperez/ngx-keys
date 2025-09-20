@@ -26,10 +26,10 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly currentlyDownKeys = new Set<string>();
   
   /**
-   * Optional filter function to determine which keyboard events should be processed.
-   * If not set, all events are processed. If set, only events where filter returns `true` are processed.
+   * Named global filters that apply to all shortcuts.
+   * All global filters must return `true` for a shortcut to be processed.
    */
-  private filterFunction: KeyboardShortcutFilter | null = null;
+  private readonly globalFilters = new Map<string, KeyboardShortcutFilter>();
   
   // Single consolidated state signal - reduces memory overhead
   private readonly state = signal({
@@ -433,35 +433,98 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   /**
-   * Set a filter function to determine which keyboard events should be processed.
-   * The filter function receives a KeyboardEvent and should return `true` to allow
-   * shortcuts to be triggered, or `false` to ignore the event.
+   * Add a named global filter that applies to all shortcuts.
+   * All global filters must return `true` for a shortcut to execute.
    * 
-   * @param filter - Function that returns `true` to process events, `false` to ignore them.
-   *                 Pass `null` to remove any existing filter.
+   * @param name - Unique name for this filter
+   * @param filter - Function that returns `true` to allow shortcuts, `false` to block them
    * 
    * @example
    * ```typescript
-   * // Ignore shortcuts when typing in form elements
-   * keyboardService.setFilter((event) => {
+   * // Block shortcuts in form elements
+   * keyboardService.addFilter('forms', (event) => {
    *   const target = event.target as HTMLElement;
    *   const tagName = target?.tagName?.toLowerCase();
    *   return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
    * });
    * 
-   * // Remove filter to allow all events
-   * keyboardService.setFilter(null);
+   * // Block shortcuts when modal is open
+   * keyboardService.addFilter('modal', (event) => {
+   *   return !document.querySelector('.modal.active');
+   * });
    * ```
    */
-  setFilter(filter: KeyboardShortcutFilter | null): void {
-    this.filterFunction = filter;
+  addFilter(name: string, filter: KeyboardShortcutFilter): void {
+    this.globalFilters.set(name, filter);
   }
 
   /**
-   * Get the current filter function, or null if no filter is set.
+   * Remove a named global filter.
+   * 
+   * @param name - Name of the filter to remove
+   * @returns `true` if filter was removed, `false` if it didn't exist
    */
-  getFilter(): KeyboardShortcutFilter | null {
-    return this.filterFunction;
+  removeFilter(name: string): boolean {
+    return this.globalFilters.delete(name);
+  }
+
+  /**
+   * Get a named global filter.
+   * 
+   * @param name - Name of the filter to retrieve
+   * @returns The filter function, or undefined if not found
+   */
+  getFilter(name: string): KeyboardShortcutFilter | undefined {
+    return this.globalFilters.get(name);
+  }
+
+  /**
+   * Get all global filter names.
+   * 
+   * @returns Array of filter names
+   */
+  getFilterNames(): string[] {
+    return Array.from(this.globalFilters.keys());
+  }
+
+  /**
+   * Remove all global filters.
+   */
+  clearFilters(): void {
+    this.globalFilters.clear();
+  }
+
+  /**
+   * Check if a named filter exists.
+   * 
+   * @param name - Name of the filter to check
+   * @returns `true` if filter exists, `false` otherwise
+   */
+  hasFilter(name: string): boolean {
+    return this.globalFilters.has(name);
+  }
+
+  /**
+   * Check if a keyboard event should be processed based on global and per-shortcut filters.
+   * 
+   * @param event - The keyboard event to evaluate
+   * @param shortcut - The shortcut being evaluated (for per-shortcut filter)
+   * @returns `true` if event should be processed, `false` if it should be ignored
+   */
+  private shouldProcessEvent(event: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
+    // First, check all global filters - ALL must return true
+    for (const globalFilter of this.globalFilters.values()) {
+      if (!globalFilter(event)) {
+        return false;
+      }
+    }
+
+    // Then check per-shortcut filter if it exists
+    if (shortcut.filter && !shortcut.filter(event)) {
+      return false;
+    }
+
+    return true;
   }
 
   private startListening(): void {
@@ -494,11 +557,6 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   protected handleKeydown(event: KeyboardEvent): void {
-    // Apply filter if one is set - if filter returns false, ignore this event
-    if (this.filterFunction && !this.filterFunction(event)) {
-      return;
-    }
-
     // Update the currently down keys with this event's key
     this.updateCurrentlyDownKeysOnKeydown(event);
 
@@ -534,7 +592,12 @@ export class KeyboardShortcuts implements OnDestroy {
           pending.stepIndex += 1;
 
           if (pending.stepIndex >= normalizedSteps.length) {
-            // Completed
+            // Completed - check filters before executing
+            if (!this.shouldProcessEvent(event, shortcut)) {
+              this.pendingSequence = null;
+              return; // Skip execution due to filters
+            }
+            
             event.preventDefault();
             event.stopPropagation();
             try {
@@ -571,6 +634,11 @@ export class KeyboardShortcuts implements OnDestroy {
 
       const firstStep = normalizedSteps[0];
       if (this.keysMatch(pressedKeys, firstStep)) {
+        // Check if this event should be processed based on filters
+        if (!this.shouldProcessEvent(event, shortcut)) {
+          continue; // Skip this shortcut due to filters
+        }
+
         if (normalizedSteps.length === 1) {
           // single-step
           event.preventDefault();

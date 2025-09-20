@@ -1098,31 +1098,65 @@ describe('KeyboardShortcuts', () => {
       service.register(testShortcut);
     });
 
-    describe('setFilter', () => {
-      it('should set and get filter function', () => {
+    describe('Named Global Filters', () => {
+      it('should add and get named filters', () => {
         const filterFn = (event: KeyboardEvent) => true;
         
-        expect(service.getFilter()).toBeNull();
+        expect(service.hasFilter('test')).toBe(false);
+        expect(service.getFilter('test')).toBeUndefined();
         
-        service.setFilter(filterFn);
+        service.addFilter('test', filterFn);
         
-        expect(service.getFilter()).toBe(filterFn);
+        expect(service.hasFilter('test')).toBe(true);
+        expect(service.getFilter('test')).toBe(filterFn);
       });
 
-      it('should allow setting filter to null', () => {
+      it('should remove named filters', () => {
         const filterFn = (event: KeyboardEvent) => true;
-        service.setFilter(filterFn);
+        service.addFilter('test', filterFn);
         
-        expect(service.getFilter()).toBe(filterFn);
+        expect(service.hasFilter('test')).toBe(true);
         
-        service.setFilter(null);
+        const removed = service.removeFilter('test');
         
-        expect(service.getFilter()).toBeNull();
+        expect(removed).toBe(true);
+        expect(service.hasFilter('test')).toBe(false);
+        expect(service.getFilter('test')).toBeUndefined();
+      });
+
+      it('should return false when removing non-existent filter', () => {
+        const removed = service.removeFilter('non-existent');
+        expect(removed).toBe(false);
+      });
+
+      it('should get all filter names', () => {
+        expect(service.getFilterNames()).toEqual([]);
+        
+        service.addFilter('filter1', () => true);
+        service.addFilter('filter2', () => false);
+        
+        const names = service.getFilterNames();
+        expect(names).toContain('filter1');
+        expect(names).toContain('filter2');
+        expect(names.length).toBe(2);
+      });
+
+      it('should clear all filters', () => {
+        service.addFilter('filter1', () => true);
+        service.addFilter('filter2', () => false);
+        
+        expect(service.getFilterNames().length).toBe(2);
+        
+        service.clearFilters();
+        
+        expect(service.getFilterNames()).toEqual([]);
+        expect(service.hasFilter('filter1')).toBe(false);
+        expect(service.hasFilter('filter2')).toBe(false);
       });
     });
 
-    describe('Event filtering', () => {
-      it('should execute shortcut when no filter is set', () => {
+    describe('Global Filter Processing', () => {
+      it('should execute shortcut when no filters are set', () => {
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
         
         service.testHandleKeydown(event);
@@ -1130,8 +1164,9 @@ describe('KeyboardShortcuts', () => {
         expect(mockAction).toHaveBeenCalled();
       });
 
-      it('should execute shortcut when filter returns true', () => {
-        service.setFilter(() => true);
+      it('should execute shortcut when all global filters return true', () => {
+        service.addFilter('filter1', () => true);
+        service.addFilter('filter2', () => true);
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
         
         service.testHandleKeydown(event);
@@ -1139,8 +1174,9 @@ describe('KeyboardShortcuts', () => {
         expect(mockAction).toHaveBeenCalled();
       });
 
-      it('should not execute shortcut when filter returns false', () => {
-        service.setFilter(() => false);
+      it('should not execute shortcut when any global filter returns false', () => {
+        service.addFilter('allow', () => true);
+        service.addFilter('block', () => false);
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
         
         service.testHandleKeydown(event);
@@ -1148,14 +1184,18 @@ describe('KeyboardShortcuts', () => {
         expect(mockAction).not.toHaveBeenCalled();
       });
 
-      it('should pass the keyboard event to the filter function', () => {
-        const filterSpy = jasmine.createSpy('filter').and.returnValue(true);
-        service.setFilter(filterSpy);
+      it('should pass the keyboard event to all filter functions', () => {
+        const filter1Spy = jasmine.createSpy('filter1').and.returnValue(true);
+        const filter2Spy = jasmine.createSpy('filter2').and.returnValue(true);
+        service.addFilter('filter1', filter1Spy);
+        service.addFilter('filter2', filter2Spy);
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
         
         service.testHandleKeydown(event);
         
-        expect(filterSpy).toHaveBeenCalledWith(event);
+        expect(filter1Spy).toHaveBeenCalledWith(event);
+        expect(filter2Spy).toHaveBeenCalledWith(event);
+        expect(mockAction).toHaveBeenCalled();
       });
 
       it('should work with input element filtering', () => {
@@ -1171,7 +1211,7 @@ describe('KeyboardShortcuts', () => {
           return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
         };
 
-        service.setFilter(inputFilter);
+        service.addFilter('inputs', inputFilter);
 
         // Test with input element - should be filtered out
         const inputEvent = createKeyboardEvent({ key: 's', ctrlKey: true });
@@ -1208,7 +1248,7 @@ describe('KeyboardShortcuts', () => {
           return !target?.isContentEditable;
         };
 
-        service.setFilter(editableFilter);
+        service.addFilter('contenteditable', editableFilter);
 
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
         Object.defineProperty(event, 'target', { value: mockEditableDiv, configurable: true });
@@ -1218,25 +1258,31 @@ describe('KeyboardShortcuts', () => {
         expect(mockAction).not.toHaveBeenCalled();
       });
 
-      it('should allow filter function to change dynamically', () => {
+      it('should allow filters to be added and removed dynamically', () => {
         // Start with permissive filter
-        service.setFilter(() => true);
+        service.addFilter('test', () => true);
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
         
         service.testHandleKeydown(event);
         expect(mockAction).toHaveBeenCalledTimes(1);
 
-        // Change to restrictive filter
-        service.setFilter(() => false);
+        // Add restrictive filter
+        service.addFilter('block', () => false);
         
         service.testHandleKeydown(event);
         expect(mockAction).toHaveBeenCalledTimes(1); // Should not increase
 
-        // Remove filter
-        service.setFilter(null);
+        // Remove restrictive filter
+        service.removeFilter('block');
         
         service.testHandleKeydown(event);
         expect(mockAction).toHaveBeenCalledTimes(2); // Should increase
+
+        // Remove all filters
+        service.clearFilters();
+        
+        service.testHandleKeydown(event);
+        expect(mockAction).toHaveBeenCalledTimes(3); // Should increase
       });
     });
 
@@ -1256,8 +1302,8 @@ describe('KeyboardShortcuts', () => {
         service.register(multiStepShortcut);
       });
 
-      it('should apply filter to multi-step shortcuts', () => {
-        service.setFilter(() => false);
+      it('should apply global filters to multi-step shortcuts', () => {
+        service.addFilter('block', () => false);
         
         // Try to start sequence - should be blocked by filter
         const firstStepEvent = createKeyboardEvent({ key: 'k', ctrlKey: true });
@@ -1270,8 +1316,8 @@ describe('KeyboardShortcuts', () => {
         expect(multiStepAction).not.toHaveBeenCalled();
       });
 
-      it('should allow multi-step shortcuts when filter permits', () => {
-        service.setFilter(() => true);
+      it('should allow multi-step shortcuts when global filters permit', () => {
+        service.addFilter('allow', () => true);
         
         // Start sequence
         const firstStepEvent = createKeyboardEvent({ key: 'k', ctrlKey: true });
@@ -1282,6 +1328,79 @@ describe('KeyboardShortcuts', () => {
         service.testHandleKeydown(secondStepEvent);
         
         expect(multiStepAction).toHaveBeenCalled();
+      });
+    });
+
+    describe('Per-Shortcut Filters', () => {
+      let perShortcutAction: jasmine.Spy;
+      let perShortcutShortcut: KeyboardShortcut;
+
+      beforeEach(() => {
+        perShortcutAction = jasmine.createSpy('perShortcutAction');
+        perShortcutShortcut = {
+          id: 'per-shortcut-filter',
+          keys: ['ctrl', 'p'],
+          macKeys: ['meta', 'p'],
+          action: perShortcutAction,
+          filter: (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement;
+            return target?.tagName?.toLowerCase() !== 'input';
+          },
+          description: 'Shortcut with per-shortcut filter'
+        };
+        service.register(perShortcutShortcut);
+      });
+
+      it('should execute shortcut when per-shortcut filter returns true', () => {
+        const mockDiv = { tagName: 'DIV' } as HTMLElement;
+        const event = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(event, 'target', { value: mockDiv, configurable: true });
+        
+        service.testHandleKeydown(event);
+        
+        expect(perShortcutAction).toHaveBeenCalled();
+      });
+
+      it('should not execute shortcut when per-shortcut filter returns false', () => {
+        const mockInput = { tagName: 'INPUT' } as HTMLElement;
+        const event = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(event, 'target', { value: mockInput, configurable: true });
+        
+        service.testHandleKeydown(event);
+        
+        expect(perShortcutAction).not.toHaveBeenCalled();
+      });
+
+      it('should apply both global and per-shortcut filters', () => {
+        // Add global filter that blocks buttons
+        service.addFilter('buttons', (event) => {
+          const target = event.target as HTMLElement;
+          return target?.tagName?.toLowerCase() !== 'button';
+        });
+
+        // Test with button (blocked by global filter)
+        const mockButton = { tagName: 'BUTTON' } as HTMLElement;
+        const buttonEvent = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(buttonEvent, 'target', { value: mockButton, configurable: true });
+        
+        service.testHandleKeydown(buttonEvent);
+        expect(perShortcutAction).not.toHaveBeenCalled();
+
+        // Test with input (blocked by per-shortcut filter)
+        const mockInput = { tagName: 'INPUT' } as HTMLElement;
+        const inputEvent = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(inputEvent, 'target', { value: mockInput, configurable: true });
+        
+        service.testHandleKeydown(inputEvent);
+        expect(perShortcutAction).not.toHaveBeenCalled();
+
+        // Test with div (allowed by both filters)
+        const mockDiv = { tagName: 'DIV' } as HTMLElement;
+        const divEvent = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(divEvent, 'target', { value: mockDiv, configurable: true });
+        
+        service.testHandleKeydown(divEvent);
+        expect(perShortcutAction).toHaveBeenCalled();
       });
     });
   });

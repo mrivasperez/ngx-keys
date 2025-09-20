@@ -17,7 +17,28 @@ export interface KeyboardShortcut {
   macSteps?: KeyStep[];
   action: () => void;
   description: string;
-  activeUntil?: KeyboardShortcutActiveUntil
+  activeUntil?: KeyboardShortcutActiveUntil;
+  /**
+   * Optional filter function for this specific shortcut.
+   * If provided, this filter is evaluated AFTER global filters.
+   * Both global filters AND this filter must return true for the shortcut to execute.
+   * 
+   * @param event - The keyboard event to evaluate
+   * @returns `true` to allow this shortcut, `false` to ignore the event
+   * 
+   * @example
+   * ```typescript
+   * // This shortcut works everywhere, even bypassing global input filters
+   * {
+   *   id: 'emergency-save',
+   *   keys: ['ctrl', 'shift', 's'],
+   *   action: () => this.emergencySave(),
+   *   filter: () => true, // Always allow
+   *   description: 'Emergency save (works in inputs)'
+   * }
+   * ```
+   */
+  filter?: KeyboardShortcutFilter;
 }
 
 export interface KeyboardShortcutGroup {
