@@ -8,7 +8,7 @@ import {
   OnDestroy,
   signal,
 } from '@angular/core';
-import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutFilter, KeyboardShortcutGroup, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
+import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutFilter, KeyboardShortcutGroup, KeyboardShortcutGroupOptions, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
 import { Observable, take } from 'rxjs';
 
@@ -24,13 +24,13 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly activeShortcuts = new Set<string>();
   private readonly activeGroups = new Set<string>();
   private readonly currentlyDownKeys = new Set<string>();
-  
+
   /**
    * Named global filters that apply to all shortcuts.
    * All global filters must return `true` for a shortcut to be processed.
    */
   private readonly globalFilters = new Map<string, KeyboardShortcutFilter>();
-  
+
   // Single consolidated state signal - reduces memory overhead
   private readonly state = signal({
     shortcuts: new Map<string, KeyboardShortcut>(),
@@ -39,17 +39,17 @@ export class KeyboardShortcuts implements OnDestroy {
     activeGroups: new Set<string>(),
     version: 0 // for change detection optimization
   });
-  
+
   // Primary computed signal - consumers derive what they need from this
   readonly shortcuts$ = computed(() => {
     const state = this.state();
     const activeShortcuts = Array.from(state.activeShortcuts)
       .map(id => state.shortcuts.get(id))
       .filter((s): s is KeyboardShortcut => s !== undefined);
-      
+
     const inactiveShortcuts = Array.from(state.shortcuts.values())
       .filter(s => !state.activeShortcuts.has(s.id));
-      
+
     return {
       active: activeShortcuts,
       inactive: inactiveShortcuts,
@@ -71,7 +71,7 @@ export class KeyboardShortcuts implements OnDestroy {
       all: shortcuts.all.map(s => this.formatShortcutForUI(s))
     };
   });
-  
+
   private readonly keydownListener = this.handleKeydown.bind(this);
   private readonly keyupListener = this.handleKeyup.bind(this);
   private readonly blurListener = this.handleWindowBlur.bind(this);
@@ -136,7 +136,7 @@ export class KeyboardShortcuts implements OnDestroy {
   private formatKeysForDisplay(keys: string[], isMac = false): string {
     const keyMap: Record<string, string> = isMac ? {
       'ctrl': '⌃',
-      'alt': '⌥', 
+      'alt': '⌥',
       'shift': '⇧',
       'meta': '⌘',
       'cmd': '⌘',
@@ -144,7 +144,7 @@ export class KeyboardShortcuts implements OnDestroy {
     } : {
       'ctrl': 'Ctrl',
       'alt': 'Alt',
-      'shift': 'Shift', 
+      'shift': 'Shift',
       'meta': 'Win'
     };
 
@@ -211,7 +211,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (conflictId) {
       throw KeyboardShortcutsErrorFactory.keyConflict(conflictId);
     }
-    
+
     this.shortcuts.set(shortcut.id, shortcut);
     this.activeShortcuts.add(shortcut.id);
     this.updateState();
@@ -224,14 +224,32 @@ export class KeyboardShortcuts implements OnDestroy {
 
   /**
    * Register multiple keyboard shortcuts as a group
+   * @param groupId - Unique identifier for the group
+   * @param shortcuts - Array of shortcuts to register as a group
+   * @param options - Optional configuration including filter and activeUntil
    * @throws KeyboardShortcutError if group ID is already registered or if any shortcut ID or key combination conflicts
    */
-  registerGroup(groupId: string, shortcuts: KeyboardShortcut[], activeUntil?: KeyboardShortcutActiveUntil): void {
+  registerGroup(groupId: string, shortcuts: KeyboardShortcut[], options?: KeyboardShortcutGroupOptions): void;
+  /**
+   * @deprecated Use registerGroup(groupId, shortcuts, { activeUntil }) instead
+   */
+  registerGroup(groupId: string, shortcuts: KeyboardShortcut[], activeUntil?: KeyboardShortcutActiveUntil): void;
+  registerGroup(groupId: string, shortcuts: KeyboardShortcut[], optionsOrActiveUntil?: KeyboardShortcutGroupOptions | KeyboardShortcutActiveUntil): void {
+    // Parse parameters - support both old (activeUntil) and new (options) formats
+    let options: KeyboardShortcutGroupOptions;
+    if (optionsOrActiveUntil && (typeof optionsOrActiveUntil === 'object') && ('filter' in optionsOrActiveUntil || 'activeUntil' in optionsOrActiveUntil)) {
+      // New format with options object
+      options = optionsOrActiveUntil as KeyboardShortcutGroupOptions;
+    } else {
+      // Old format with just activeUntil parameter
+      options = { activeUntil: optionsOrActiveUntil as KeyboardShortcutActiveUntil };
+    }
+
     // Check if group ID already exists
     if (this.groups.has(groupId)) {
       throw KeyboardShortcutsErrorFactory.groupAlreadyRegistered(groupId);
     }
-    
+
     // Check for duplicate shortcut IDs and key combination conflicts
     const duplicateIds: string[] = [];
     const keyConflicts: string[] = [];
@@ -244,7 +262,7 @@ export class KeyboardShortcuts implements OnDestroy {
         keyConflicts.push(`"${shortcut.id}" conflicts with "${conflictId}"`);
       }
     });
-    
+
     if (duplicateIds.length > 0) {
       throw KeyboardShortcutsErrorFactory.shortcutIdsAlreadyRegistered(duplicateIds);
     }
@@ -252,7 +270,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (keyConflicts.length > 0) {
       throw KeyboardShortcutsErrorFactory.keyConflictsInGroup(keyConflicts);
     }
-    
+
     // Validate that all shortcuts have unique IDs within the group
     const groupIds = new Set<string>();
     const duplicatesInGroup: string[] = [];
@@ -263,22 +281,23 @@ export class KeyboardShortcuts implements OnDestroy {
         groupIds.add(shortcut.id);
       }
     });
-    
+
     if (duplicatesInGroup.length > 0) {
       throw KeyboardShortcutsErrorFactory.duplicateShortcutsInGroup(duplicatesInGroup);
     }
-    
+
     // Use batch update to reduce signal updates
     this.batchUpdate(() => {
       const group: KeyboardShortcutGroup = {
         id: groupId,
         shortcuts,
-        active: true
+        active: true,
+        filter: options.filter
       };
-      
+
       this.groups.set(groupId, group);
       this.activeGroups.add(groupId);
-      
+
       // Register individual shortcuts
       shortcuts.forEach(shortcut => {
         this.shortcuts.set(shortcut.id, shortcut);
@@ -287,7 +306,7 @@ export class KeyboardShortcuts implements OnDestroy {
     });
 
     this.setupActiveUntil(
-      activeUntil,
+      options.activeUntil,
       this.unregisterGroup.bind(this, groupId),
     );
   }
@@ -300,7 +319,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (!this.shortcuts.has(shortcutId)) {
       throw KeyboardShortcutsErrorFactory.cannotUnregisterShortcut(shortcutId);
     }
-    
+
     this.shortcuts.delete(shortcutId);
     this.activeShortcuts.delete(shortcutId);
     this.updateState();
@@ -315,7 +334,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (!group) {
       throw KeyboardShortcutsErrorFactory.cannotUnregisterGroup(groupId);
     }
-    
+
     this.batchUpdate(() => {
       group.shortcuts.forEach(shortcut => {
         this.shortcuts.delete(shortcut.id);
@@ -334,7 +353,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (!this.shortcuts.has(shortcutId)) {
       throw KeyboardShortcutsErrorFactory.cannotActivateShortcut(shortcutId);
     }
-    
+
     this.activeShortcuts.add(shortcutId);
     this.updateState();
   }
@@ -347,7 +366,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (!this.shortcuts.has(shortcutId)) {
       throw KeyboardShortcutsErrorFactory.cannotDeactivateShortcut(shortcutId);
     }
-    
+
     this.activeShortcuts.delete(shortcutId);
     this.updateState();
   }
@@ -361,7 +380,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (!group) {
       throw KeyboardShortcutsErrorFactory.cannotActivateGroup(groupId);
     }
-    
+
     this.batchUpdate(() => {
       group.active = true;
       this.activeGroups.add(groupId);
@@ -380,7 +399,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (!group) {
       throw KeyboardShortcutsErrorFactory.cannotDeactivateGroup(groupId);
     }
-    
+
     this.batchUpdate(() => {
       group.active = false;
       this.activeGroups.delete(groupId);
@@ -505,7 +524,23 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   /**
-   * Check if a keyboard event should be processed based on global and per-shortcut filters.
+   * Find the group that contains a specific shortcut.
+   * 
+   * @param shortcutId - The ID of the shortcut to find
+   * @returns The group containing the shortcut, or undefined if not found in any group
+   */
+  private findGroupForShortcut(shortcutId: string): KeyboardShortcutGroup | undefined {
+    for (const group of this.groups.values()) {
+      if (group.shortcuts.some(s => s.id === shortcutId)) {
+        return group;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Check if a keyboard event should be processed based on global, group, and per-shortcut filters.
+   * Filter hierarchy: Global filters → Group filter → Individual shortcut filter
    * 
    * @param event - The keyboard event to evaluate
    * @param shortcut - The shortcut being evaluated (for per-shortcut filter)
@@ -519,7 +554,13 @@ export class KeyboardShortcuts implements OnDestroy {
       }
     }
 
-    // Then check per-shortcut filter if it exists
+    // Then check group filter if shortcut belongs to a group
+    const group = this.findGroupForShortcut(shortcut.id);
+    if (group?.filter && !group.filter(event)) {
+      return false;
+    }
+
+    // Finally check per-shortcut filter if it exists
     if (shortcut.filter && !shortcut.filter(event)) {
       return false;
     }
@@ -531,7 +572,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (this.isListening) {
       return;
     }
-    
+
     // Listen to both keydown and keyup so we can maintain a Set of currently
     // pressed physical keys. We avoid passive:true because we may call
     // preventDefault() when matching shortcuts.
@@ -548,7 +589,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (!this.isListening) {
       return;
     }
-    
+
     this.document.removeEventListener('keydown', this.keydownListener);
     this.document.removeEventListener('keyup', this.keyupListener);
     this.window.removeEventListener('blur', this.blurListener);
@@ -560,11 +601,6 @@ export class KeyboardShortcuts implements OnDestroy {
     // Update the currently down keys with this event's key
     this.updateCurrentlyDownKeysOnKeydown(event);
 
-    // Build the pressed keys set used for matching. Prefer the currentlyDownKeys
-    // if it contains more than one non-modifier key; otherwise fall back to the
-    // traditional per-event pressed keys calculation for compatibility.
-  // Use a Set for matching to avoid allocations and sorting on every event
-  const pressedKeys = this.buildPressedKeysForMatch(event);
     const isMac = this.isMacPlatform();
 
     // If there is a pending multi-step sequence, try to advance it first
@@ -597,7 +633,7 @@ export class KeyboardShortcuts implements OnDestroy {
               this.pendingSequence = null;
               return; // Skip execution due to filters
             }
-            
+
             event.preventDefault();
             event.stopPropagation();
             try {
@@ -617,8 +653,8 @@ export class KeyboardShortcuts implements OnDestroy {
           this.clearPendingSequence();
         }
       } else {
-  // pending exists but shortcut not found
-  this.clearPendingSequence();
+        // pending exists but shortcut not found
+        this.clearPendingSequence();
       }
     }
 
@@ -633,7 +669,17 @@ export class KeyboardShortcuts implements OnDestroy {
       const normalizedSteps = this.normalizeToSteps(steps as KeyStep[] | string[]);
 
       const firstStep = normalizedSteps[0];
-      if (this.keysMatch(pressedKeys, firstStep)) {
+
+      // Decide which pressed-keys representation to use for this shortcut's
+      // expected step: if it requires multiple non-modifier keys, treat it as
+      // a chord and use accumulated keys; otherwise use per-event keys to avoid
+      // interference from previously pressed non-modifier keys.
+      const nonModifierCount = firstStep.filter(k => !['ctrl', 'alt', 'shift', 'meta'].includes(k.toLowerCase())).length;
+      const pressedForStep: Set<string> | string[] = nonModifierCount > 1
+        ? this.buildPressedKeysForMatch(event)
+        : this.getPressedKeys(event);
+
+      if (this.keysMatch(pressedForStep, firstStep)) {
         // Check if this event should be processed based on filters
         if (!this.shouldProcessEvent(event, shortcut)) {
           continue; // Skip this shortcut due to filters
@@ -776,18 +822,18 @@ export class KeyboardShortcuts implements OnDestroy {
 
   protected getPressedKeys(event: KeyboardEvent): string[] {
     const keys: string[] = [];
-    
+
     if (event.ctrlKey) keys.push('ctrl');
     if (event.altKey) keys.push('alt');
     if (event.shiftKey) keys.push('shift');
     if (event.metaKey) keys.push('meta');
-    
+
     // Add the main key (normalize to lowercase)
     const key = event.key.toLowerCase();
     if (!['control', 'alt', 'shift', 'meta'].includes(key)) {
       keys.push(key);
     }
-    
+
     return keys;
   }
 
@@ -808,14 +854,14 @@ export class KeyboardShortcuts implements OnDestroy {
     if (pressedSet.size !== normalizedTarget.size) {
       return false;
     }
-    
+
     // Check if every element in normalizedTarget exists in pressedSet
     for (const key of normalizedTarget) {
       if (!pressedSet.has(key)) {
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -840,8 +886,8 @@ export class KeyboardShortcuts implements OnDestroy {
   protected isMacPlatform(): boolean {
     return /Mac|iPod|iPhone|iPad/.test(this.window.navigator.platform ?? '');
   }
-  
-  protected setupActiveUntil (activeUntil: KeyboardShortcutActiveUntil|undefined, unregister: () => void) {
+
+  protected setupActiveUntil(activeUntil: KeyboardShortcutActiveUntil | undefined, unregister: () => void) {
     if (!activeUntil) {
       return
     }
@@ -849,13 +895,16 @@ export class KeyboardShortcuts implements OnDestroy {
     if (activeUntil === 'destruct') {
       inject(DestroyRef).onDestroy(unregister);
       return
-    } 
-    
-    if (activeUntil instanceof DestroyRef) {
-      activeUntil.onDestroy(unregister);
+    }
+
+    // Support both real DestroyRef instances and duck-typed objects (e.g.,
+    // Jasmine spies) that expose an onDestroy(fn) method for backwards
+    // compatibility with earlier APIs and tests.
+    if ((activeUntil as any) instanceof DestroyRef || typeof (activeUntil as any).onDestroy === 'function') {
+      (activeUntil as any).onDestroy(unregister);
       return
-    } 
-    
+    }
+
     if (activeUntil instanceof Observable) {
       activeUntil.pipe(take(1)).subscribe(unregister);
       return

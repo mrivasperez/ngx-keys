@@ -45,6 +45,24 @@ export interface KeyboardShortcutGroup {
   id: string;
   shortcuts: KeyboardShortcut[];
   active: boolean;
+  /**
+   * Optional filter function for this entire group.
+   * If provided, this filter is evaluated AFTER global filters but BEFORE individual shortcut filters.
+   * The filter hierarchy is: Global filters → Group filter → Individual shortcut filter.
+   * All applicable filters must return true for a shortcut to execute.
+   * 
+   * @param event - The keyboard event to evaluate
+   * @returns `true` to allow shortcuts in this group, `false` to ignore the event
+   * 
+   * @example
+   * ```typescript
+   * // Modal shortcuts group that only works when modal is active
+   * keyboardService.registerGroup('modal-shortcuts', shortcuts, {
+   *   filter: (event) => !!document.querySelector('.modal.active')
+   * });
+   * ```
+   */
+  filter?: KeyboardShortcutFilter;
 }
 
 /**
@@ -67,6 +85,21 @@ export interface KeyboardShortcutGroup {
  * ```
  */
 export type KeyboardShortcutFilter = (event: KeyboardEvent) => boolean;
+
+/**
+ * Options for registering a group of keyboard shortcuts
+ */
+export interface KeyboardShortcutGroupOptions {
+  /**
+   * Optional filter function for the entire group.
+   * This filter is evaluated after global filters but before individual shortcut filters.
+   */
+  filter?: KeyboardShortcutFilter;
+  /**
+   * Optional lifecycle management for automatic cleanup
+   */
+  activeUntil?: KeyboardShortcutActiveUntil;
+}
 
 /**
  * Interface for keyboard shortcut data optimized for UI display
