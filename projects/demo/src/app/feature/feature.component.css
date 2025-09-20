@@ -1,0 +1,17 @@
+/* Layout only */
+.controls {
+  margin: 2rem 0;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.shortcuts-display {
+  margin: 2rem 0;
+}
+
+@media (max-width: 768px) {
+  .controls {
+    flex-direction: column;
+  }
+}

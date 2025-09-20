@@ -1,7 +1,8 @@
-import { Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
+import { DestroyRef, Injectable, OnDestroy, PLATFORM_ID, inject, signal, computed } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { KeyboardShortcut, KeyboardShortcutGroup, KeyboardShortcutUI } from './keyboard-shortcut.interface';
+import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutGroup, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
+import { Observable, take } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -11,6 +12,7 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly groups = new Map<string, KeyboardShortcutGroup>();
   private readonly activeShortcuts = new Set<string>();
   private readonly activeGroups = new Set<string>();
+  private readonly currentlyDownKeys = new Set<string>();
   
   // Single consolidated state signal - reduces memory overhead
   private readonly state = signal({
@@ -54,8 +56,20 @@ export class KeyboardShortcuts implements OnDestroy {
   });
   
   private readonly keydownListener = this.handleKeydown.bind(this);
+  private readonly keyupListener = this.handleKeyup.bind(this);
+  private readonly blurListener = this.handleWindowBlur.bind(this);
+  private readonly visibilityListener = this.handleVisibilityChange.bind(this);
   private isListening = false;
   protected isBrowser: boolean;
+  /** Default timeout (ms) for completing a multi-step sequence */
+  protected sequenceTimeout = 2000;
+
+  /** Runtime state for multi-step sequences */
+  private pendingSequence: {
+    shortcutId: string;
+    stepIndex: number;
+    timerId: any;
+  } | null = null;
 
   constructor() {
     // Use try-catch to handle injection context for better testability
@@ -95,8 +109,8 @@ export class KeyboardShortcuts implements OnDestroy {
   formatShortcutForUI(shortcut: KeyboardShortcut): KeyboardShortcutUI {
     return {
       id: shortcut.id,
-      keys: this.formatKeysForDisplay(shortcut.keys, false),
-      macKeys: this.formatKeysForDisplay(shortcut.macKeys, true),
+      keys: this.formatStepsForDisplay(shortcut.keys ?? shortcut.steps ?? [], false),
+      macKeys: this.formatStepsForDisplay(shortcut.macKeys ?? shortcut.macSteps ?? [], true),
       description: shortcut.description
     };
   }
@@ -132,16 +146,45 @@ export class KeyboardShortcuts implements OnDestroy {
       .join('+');
   }
 
+  private formatStepsForDisplay(steps: string[] | string[][], isMac = false): string {
+    if (!steps) return '';
+
+    // If the first element is an array, assume steps is string[][]
+    const normalized = this.normalizeToSteps(steps as KeyStep[] | string[]);
+    if (normalized.length === 0) return '';
+    if (normalized.length === 1) return this.formatKeysForDisplay(normalized[0], isMac);
+    return normalized.map(step => this.formatKeysForDisplay(step, isMac)).join(', ');
+  }
+
+  private normalizeToSteps(input: KeyStep[] | string[]): KeyStep[] {
+    if (!input) return [];
+    // If first element is an array, assume already KeyStep[]
+    if (Array.isArray(input[0])) {
+      return input as KeyStep[];
+    }
+    // Single step array
+    return [input as string[]];
+  }
+
   /**
    * Check if a key combination is already registered
    * @returns The ID of the conflicting shortcut, or null if no conflict
    */
   private findConflict(newShortcut: KeyboardShortcut): string | null {
     for (const existing of this.shortcuts.values()) {
-      if (this.keysMatch(newShortcut.keys, existing.keys)) {
+      // Compare single-step shapes if provided
+      if (newShortcut.keys && existing.keys && this.keysMatch(newShortcut.keys, existing.keys)) {
         return existing.id;
       }
-      if (this.keysMatch(newShortcut.macKeys, existing.macKeys)) {
+      if (newShortcut.macKeys && existing.macKeys && this.keysMatch(newShortcut.macKeys, existing.macKeys)) {
+        return existing.id;
+      }
+
+      // Compare multi-step shapes
+      if (newShortcut.steps && existing.steps && this.stepsMatch(newShortcut.steps, existing.steps)) {
+        return existing.id;
+      }
+      if (newShortcut.macSteps && existing.macSteps && this.stepsMatch(newShortcut.macSteps, existing.macSteps)) {
         return existing.id;
       }
     }
@@ -165,13 +208,18 @@ export class KeyboardShortcuts implements OnDestroy {
     this.shortcuts.set(shortcut.id, shortcut);
     this.activeShortcuts.add(shortcut.id);
     this.updateState();
+
+    this.setupActiveUntil(
+      shortcut.activeUntil,
+      this.unregister.bind(this, shortcut.id),
+    );
   }
 
   /**
    * Register multiple keyboard shortcuts as a group
    * @throws KeyboardShortcutError if group ID is already registered or if any shortcut ID or key combination conflicts
    */
-  registerGroup(groupId: string, shortcuts: KeyboardShortcut[]): void {
+  registerGroup(groupId: string, shortcuts: KeyboardShortcut[], activeUntil?: KeyboardShortcutActiveUntil): void {
     // Check if group ID already exists
     if (this.groups.has(groupId)) {
       throw KeyboardShortcutsErrorFactory.groupAlreadyRegistered(groupId);
@@ -230,6 +278,11 @@ export class KeyboardShortcuts implements OnDestroy {
         this.activeShortcuts.add(shortcut.id);
       });
     });
+
+    this.setupActiveUntil(
+      activeUntil,
+      this.unregisterGroup.bind(this, groupId),
+    );
   }
 
   /**
@@ -377,7 +430,15 @@ export class KeyboardShortcuts implements OnDestroy {
       return;
     }
     
+    // Listen to both keydown and keyup so we can maintain a Set of currently
+    // pressed physical keys. We avoid passive:true because we may call
+    // preventDefault() when matching shortcuts.
     document.addEventListener('keydown', this.keydownListener, { passive: false });
+    document.addEventListener('keyup', this.keyupListener, { passive: false });
+    // Listen for blur/visibility changes so we can clear the currently-down keys
+    // and avoid stale state when the browser or tab loses focus.
+    window.addEventListener('blur', this.blurListener);
+    document.addEventListener('visibilitychange', this.visibilityListener);
     this.isListening = true;
   }
 
@@ -387,32 +448,223 @@ export class KeyboardShortcuts implements OnDestroy {
     }
     
     document.removeEventListener('keydown', this.keydownListener);
+    document.removeEventListener('keyup', this.keyupListener);
+    window.removeEventListener('blur', this.blurListener);
+    document.removeEventListener('visibilitychange', this.visibilityListener);
     this.isListening = false;
   }
 
   protected handleKeydown(event: KeyboardEvent): void {
-    const pressedKeys = this.getPressedKeys(event);
+    // Update the currently down keys with this event's key
+    this.updateCurrentlyDownKeysOnKeydown(event);
+
+    // Build the pressed keys set used for matching. Prefer the currentlyDownKeys
+    // if it contains more than one non-modifier key; otherwise fall back to the
+    // traditional per-event pressed keys calculation for compatibility.
+  // Use a Set for matching to avoid allocations and sorting on every event
+  const pressedKeys = this.buildPressedKeysForMatch(event);
     const isMac = this.isMacPlatform();
-    
+
+    // If there is a pending multi-step sequence, try to advance it first
+    if (this.pendingSequence) {
+      const pending = this.pendingSequence;
+      const shortcut = this.shortcuts.get(pending.shortcutId);
+      if (shortcut) {
+        const steps = isMac
+          ? (shortcut.macSteps ?? shortcut.macKeys ?? shortcut.steps ?? shortcut.keys ?? [])
+          : (shortcut.steps ?? shortcut.keys ?? shortcut.macSteps ?? shortcut.macKeys ?? []);
+        const normalizedSteps = this.normalizeToSteps(steps as KeyStep[] | string[]);
+        const expected = normalizedSteps[pending.stepIndex];
+
+        // Use per-event pressed keys for advancing sequence steps. Relying on
+        // the accumulated `currentlyDownKeys` can accidentally include keys
+        // from previous steps (if tests or callers don't emit keyup), which
+        // would prevent matching a simple single-key step like ['s'] after
+        // a prior ['k'] step. Use getPressedKeys(event) which reflects the
+        // actual modifier/main-key state for this event.
+        const stepPressed = this.getPressedKeys(event);
+
+        if (expected && this.keysMatch(stepPressed, expected)) {
+          // Advance sequence
+          clearTimeout(pending.timerId);
+          pending.stepIndex += 1;
+
+          if (pending.stepIndex >= normalizedSteps.length) {
+            // Completed
+            event.preventDefault();
+            event.stopPropagation();
+            try {
+              shortcut.action();
+            } catch (error) {
+              console.error(`Error executing keyboard shortcut "${shortcut.id}":`, error);
+            }
+            this.pendingSequence = null;
+            return;
+          }
+
+          // Reset timer for next step
+          pending.timerId = setTimeout(() => { this.pendingSequence = null; }, this.sequenceTimeout);
+          return;
+        } else {
+          // Cancel pending if doesn't match
+          this.clearPendingSequence();
+        }
+      } else {
+  // pending exists but shortcut not found
+  this.clearPendingSequence();
+      }
+    }
+
+    // No pending sequence - check active shortcuts for a match or sequence start
     for (const shortcutId of this.activeShortcuts) {
       const shortcut = this.shortcuts.get(shortcutId);
       if (!shortcut) continue;
-      
-      const targetKeys = isMac ? shortcut.macKeys : shortcut.keys;
-      
-      if (this.keysMatch(pressedKeys, targetKeys)) {
-        event.preventDefault();
-        event.stopPropagation();
-        
-        try {
-          shortcut.action();
-        } catch (error) {
-          console.error(`Error executing keyboard shortcut "${shortcut.id}":`, error);
+
+      const steps = isMac
+        ? (shortcut.macSteps ?? shortcut.macKeys ?? shortcut.steps ?? shortcut.keys ?? [])
+        : (shortcut.steps ?? shortcut.keys ?? shortcut.macSteps ?? shortcut.macKeys ?? []);
+      const normalizedSteps = this.normalizeToSteps(steps as KeyStep[] | string[]);
+
+      const firstStep = normalizedSteps[0];
+      if (this.keysMatch(pressedKeys, firstStep)) {
+        if (normalizedSteps.length === 1) {
+          // single-step
+          event.preventDefault();
+          event.stopPropagation();
+          try {
+            shortcut.action();
+          } catch (error) {
+            console.error(`Error executing keyboard shortcut "${shortcut.id}":`, error);
+          }
+          break;
+        } else {
+          // start pending sequence
+          if (this.pendingSequence) {
+            this.clearPendingSequence();
+          }
+          this.pendingSequence = {
+            shortcutId: shortcut.id,
+            stepIndex: 1,
+            timerId: setTimeout(() => { this.pendingSequence = null; }, this.sequenceTimeout)
+          };
+          event.preventDefault();
+          event.stopPropagation();
+          return;
         }
-        
-        break; // Only execute the first matching shortcut
       }
     }
+  }
+
+  protected handleKeyup(event: KeyboardEvent): void {
+    // Remove the key from currentlyDownKeys on keyup
+    const key = event.key ? event.key.toLowerCase() : '';
+    if (key && !['control', 'alt', 'shift', 'meta'].includes(key)) {
+      this.currentlyDownKeys.delete(key);
+    }
+  }
+
+  /**
+   * Clear the currently-down keys. Exposed for testing and for use by
+   * blur/visibilitychange handlers to avoid stale state when the page loses focus.
+   */
+  clearCurrentlyDownKeys(): void {
+    this.currentlyDownKeys.clear();
+  }
+
+  protected handleWindowBlur(): void {
+    this.clearCurrentlyDownKeys();
+    // Clear any pressed keys and any pending multi-step sequence to avoid
+    // stale state when the window loses focus.
+    this.clearPendingSequence();
+  }
+
+  protected handleVisibilityChange(): void {
+    if (document.visibilityState === 'hidden') {
+      // When the document becomes hidden, clear both pressed keys and any
+      // pending multi-step sequence. This prevents sequences from remaining
+      // active when the user switches tabs or minimizes the window.
+      this.clearCurrentlyDownKeys();
+      this.clearPendingSequence();
+    }
+  }
+
+  /**
+   * Update the currentlyDownKeys set when keydown events happen.
+   * Normalizes common keys (function keys, space, etc.) to the same values
+   * used by getPressedKeys/keysMatch.
+   */
+  protected updateCurrentlyDownKeysOnKeydown(event: KeyboardEvent): void {
+    const key = event.key ? event.key.toLowerCase() : '';
+
+    // Ignore modifier-only keydown entries
+    if (['control', 'alt', 'shift', 'meta'].includes(key)) {
+      return;
+    }
+
+    // Normalize some special cases similar to the demo component's recording logic
+    if (event.code && event.code.startsWith('F') && /^F\d+$/.test(event.code)) {
+      this.currentlyDownKeys.add(event.code.toLowerCase());
+      return;
+    }
+
+    if (key === ' ') {
+      this.currentlyDownKeys.add('space');
+      return;
+    }
+
+    if (key === 'escape') {
+      this.currentlyDownKeys.add('escape');
+      return;
+    }
+
+    if (key === 'enter') {
+      this.currentlyDownKeys.add('enter');
+      return;
+    }
+
+    if (key && key.length > 0) {
+      this.currentlyDownKeys.add(key);
+    }
+  }
+
+  /**
+   * Build the pressed keys array used for matching against registered shortcuts.
+   * If multiple non-modifier keys are currently down, include them (chord support).
+   * Otherwise fall back to single main-key detection from the event for compatibility.
+   */
+  /**
+   * Build the pressed keys set used for matching against registered shortcuts.
+   * If multiple non-modifier keys are currently down, include them (chord support).
+   * Otherwise fall back to single main-key detection from the event for compatibility.
+   *
+   * Returns a Set<string> (lowercased) to allow O(1) lookups and O(n) comparisons
+   * without sorting or allocating sorted arrays on every event.
+   */
+  protected buildPressedKeysForMatch(event: KeyboardEvent): Set<string> {
+    const modifiers = new Set<string>();
+    if (event.ctrlKey) modifiers.add('ctrl');
+    if (event.altKey) modifiers.add('alt');
+    if (event.shiftKey) modifiers.add('shift');
+    if (event.metaKey) modifiers.add('meta');
+
+    // Collect non-modifier keys from currentlyDownKeys (excluding modifiers)
+    const nonModifierKeys = Array.from(this.currentlyDownKeys).filter(k => !['control', 'alt', 'shift', 'meta'].includes(k));
+
+    const result = new Set<string>();
+    // Add modifiers first
+    modifiers.forEach(m => result.add(m));
+
+    if (nonModifierKeys.length > 0) {
+      nonModifierKeys.forEach(k => result.add(k.toLowerCase()));
+      return result;
+    }
+
+    // Fallback: single main key from the event (existing behavior)
+    const key = event.key.toLowerCase();
+    if (!['control', 'alt', 'shift', 'meta'].includes(key)) {
+      result.add(key);
+    }
+    return result;
   }
 
   protected getPressedKeys(event: KeyboardEvent): string[] {
@@ -432,19 +684,74 @@ export class KeyboardShortcuts implements OnDestroy {
     return keys;
   }
 
-  protected keysMatch(pressedKeys: string[], targetKeys: string[]): boolean {
-    if (pressedKeys.length !== targetKeys.length) {
+  /**
+   * Compare pressed keys against a target key combination.
+   * Accepts either a Set<string> (preferred) or an array for backwards compatibility.
+   * Uses Set-based comparison: sizes must match and every element in target must exist in pressed.
+   */
+  protected keysMatch(pressedKeys: Set<string> | string[], targetKeys: string[]): boolean {
+    // Normalize targetKeys into a Set<string> (lowercased)
+    const normalizedTarget = new Set<string>(targetKeys.map(k => k.toLowerCase()));
+
+    // Normalize pressedKeys into a Set<string> if it's an array
+    const pressedSet: Set<string> = Array.isArray(pressedKeys)
+      ? new Set<string>(pressedKeys.map(k => k.toLowerCase()))
+      : new Set<string>(Array.from(pressedKeys).map(k => k.toLowerCase()));
+
+    if (pressedSet.size !== normalizedTarget.size) {
       return false;
     }
     
-    // Normalize and sort both arrays for comparison
-    const normalizedPressed = pressedKeys.map(key => key.toLowerCase()).sort();
-    const normalizedTarget = targetKeys.map(key => key.toLowerCase()).sort();
+    // Check if every element in normalizedTarget exists in pressedSet
+    for (const key of normalizedTarget) {
+      if (!pressedSet.has(key)) {
+        return false;
+      }
+    }
     
-    return normalizedPressed.every((key, index) => key === normalizedTarget[index]);
+    return true;
+  }
+
+  /** Compare two multi-step sequences for equality */
+  protected stepsMatch(a: string[][], b: string[][]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!this.keysMatch(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  /** Safely clear any pending multi-step sequence */
+  private clearPendingSequence(): void {
+    if (!this.pendingSequence) return;
+    try {
+      clearTimeout(this.pendingSequence.timerId);
+    } catch { /* ignore */ }
+    this.pendingSequence = null;
   }
 
   protected isMacPlatform(): boolean {
     return this.isBrowser && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+  }
+  
+  protected setupActiveUntil (activeUntil: KeyboardShortcutActiveUntil|undefined, unregister: () => void) {
+    if (!activeUntil) {
+      return
+    }
+
+    if (activeUntil === 'destruct') {
+      inject(DestroyRef).onDestroy(unregister);
+      return
+    } 
+    
+    if (activeUntil instanceof DestroyRef) {
+      activeUntil.onDestroy(unregister);
+      return
+    } 
+    
+    if (activeUntil instanceof Observable) {
+      activeUntil.pipe(take(1)).subscribe(unregister);
+      return
+    }
   }
 }
