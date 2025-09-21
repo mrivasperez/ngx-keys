@@ -37,25 +37,39 @@ export interface MockShortcutConfig {
 }
 
 /**
- * Creates a testable KeyboardShortcuts service instance with exposed protected methods
+ * NOTE: Tests should interact with the service via the service's public surface only.
+// To support zoneless tests we provide DOM event dispatch helpers below so
+// tests can simulate keyboard events instead of reaching into protected
+// methods. Avoid exporting internal/protected APIs from production code.
+
+/**
+ * Dispatches a keyboard event on the document for zoneless tests.
+ * The event bubbles and is cancelable by default to match the real events.
  */
-@Injectable()
-export class TestableKeyboardShortcuts extends KeyboardShortcuts {
-  constructor() {
-    super();
-    // Override platform detection for testing
-    (this as any).isListening = false;
+export function dispatchKeyEvent(event: KeyboardEvent): void {
+  document.dispatchEvent(event);
+}
+
+/**
+ * Simulate window blur for tests (clears pressed keys and pending sequences).
+ */
+export function dispatchWindowBlur(): void {
+  // Dispatch a blur on window
+  try {
+    (window as any).dispatchEvent(new Event('blur'));
+  } catch {
+    // Some test runtimes may not allow dispatching on window; try fallback
+    const evt = new Event('blur');
+    (globalThis as any).window?.dispatchEvent?.(evt);
   }
+}
 
-  // Expose protected blur/visibility handlers for tests
-  public testHandleWindowBlur = this.handleWindowBlur.bind(this);
-
-  // Make protected methods public for testing
-  public testHandleKeydown = this.handleKeydown.bind(this);
-  public testGetPressedKeys = (event: KeyboardEvent) => this.getPressedKeys(event);
-  public testKeysMatch = (pressed: string[], target: string[]) => this.keysMatch(pressed, target);
-  public testStepsMatch = (a: string[][], b: string[][]) => this.stepsMatch(a, b);
-  public testIsMacPlatform = () => this.isMacPlatform();
+/**
+ * Simulate document visibility change to hidden
+ */
+export function dispatchVisibilityHidden(): void {
+  Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
 }
 
 /**
@@ -158,14 +172,16 @@ export function createMultiStepMockShortcut(config: {
  * Helper to simulate a complete multi-step sequence
  */
 export function simulateMultiStepSequence(
-  service: TestableKeyboardShortcuts, 
+  service: KeyboardShortcuts,
   steps: string[][], 
   delay: number = 100
 ): void {
   steps.forEach((step, index) => {
     setTimeout(() => {
       const event = createStepEvent(step);
-      service.testHandleKeydown(event);
+      // Dispatch the event on the document so the service's event listeners
+      // (registered in startListening) will receive it in a zoneless-friendly way.
+      dispatchKeyEvent(event);
     }, index * delay);
   });
 }
