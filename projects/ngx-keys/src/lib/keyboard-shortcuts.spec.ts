@@ -484,8 +484,8 @@ describe('KeyboardShortcuts', () => {
     it('should correctly parse pressed keys from keyboard event', () => {
       const event = KeyboardEvents.ctrlS();
 
-      const pressedKeys = service.testGetPressedKeys(event);
-      expect(pressedKeys).toEqual(['ctrl', 's']);
+  const pressedKeys = service.testGetPressedKeys(event);
+  expect(pressedKeys).toEqual(new Set(['ctrl', 's']));
     });
 
     it('should detect and match a chord of two non-modifier keys', () => {
@@ -649,8 +649,8 @@ describe('KeyboardShortcuts', () => {
     it('should parse multiple modifier keys', () => {
       const event = KeyboardEvents.allModifiers('a');
 
-      const pressedKeys = service.testGetPressedKeys(event);
-      expect(pressedKeys).toEqual(['ctrl', 'alt', 'shift', 'meta', 'a']);
+  const pressedKeys = service.testGetPressedKeys(event);
+  expect(pressedKeys).toEqual(new Set(['ctrl', 'alt', 'shift', 'meta', 'a']));
     });
 
     it('should ignore modifier keys as main key', () => {
@@ -659,15 +659,15 @@ describe('KeyboardShortcuts', () => {
         key: 'control'
       });
 
-      const pressedKeys = service.testGetPressedKeys(event);
-      expect(pressedKeys).toEqual(['ctrl']);
+  const pressedKeys = service.testGetPressedKeys(event);
+  expect(pressedKeys).toEqual(new Set(['ctrl']));
     });
 
     it('should handle special keys', () => {
       const event = KeyboardEvents.enter();
 
-      const pressedKeys = service.testGetPressedKeys(event);
-      expect(pressedKeys).toEqual(['enter']);
+  const pressedKeys = service.testGetPressedKeys(event);
+  expect(pressedKeys).toEqual(new Set(['enter']));
     });
 
     it('should match keys correctly', () => {

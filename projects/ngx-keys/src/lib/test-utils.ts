@@ -52,8 +52,10 @@ export class TestableKeyboardShortcuts extends KeyboardShortcuts {
 
   // Make protected methods public for testing
   public testHandleKeydown = this.handleKeydown.bind(this);
-  public testGetPressedKeys = (event: KeyboardEvent) => this.getPressedKeys(event);
-  public testKeysMatch = (pressed: string[], target: string[]) => this.keysMatch(pressed, target);
+  // Expose the canonical Set-based API for pressed keys to tests
+  public testGetPressedKeys = (event: KeyboardEvent): Set<string> => this.getPressedKeys(event);
+  // KeysMatch accepts either a Set or an array; keep the helper flexible for tests
+  public testKeysMatch = (pressed: Set<string> | string[], target: string[]) => this.keysMatch(pressed as any, target);
   public testStepsMatch = (a: string[][], b: string[][]) => this.stepsMatch(a, b);
   public testIsMacPlatform = () => this.isMacPlatform();
 }

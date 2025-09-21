@@ -12,10 +12,39 @@ import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutFilter, 
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
 import { Observable, take } from 'rxjs';
 
+/**
+ * Type guard to detect KeyboardShortcutGroupOptions at runtime.
+ * Centralising this logic keeps registerGroup simpler and less fragile.
+ */
+function isGroupOptions(param: unknown): param is KeyboardShortcutGroupOptions {
+  if (!param || typeof param !== 'object') return false;
+  // Narrow to object for property checks
+  const obj = param as Record<string, unknown>;
+  return ('filter' in obj) || ('activeUntil' in obj);
+}
+
+/**
+ * Detect real DestroyRef instances or duck-typed objects exposing onDestroy(fn).
+ * Returns true for either an actual DestroyRef or an object with an onDestroy method.
+ */
+function isDestroyRefLike(obj: unknown): obj is DestroyRef & { onDestroy: (fn: () => void) => void } {
+  if (!obj || typeof obj !== 'object') return false;
+  try {
+    // Prefer instanceof when available (real DestroyRef)
+    if (obj instanceof DestroyRef) return true;
+  } catch {
+    // instanceof may throw if DestroyRef is not constructable in certain runtimes/tests
+  }
+
+  const o = obj as Record<string, unknown>;
+  return typeof o['onDestroy'] === 'function';
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class KeyboardShortcuts implements OnDestroy {
+  private static readonly MODIFIER_KEYS = new Set(['control', 'alt', 'shift', 'meta']);
   private readonly document = inject(DOCUMENT);
   private readonly window = this.document.defaultView!;
 
@@ -239,9 +268,9 @@ export class KeyboardShortcuts implements OnDestroy {
   registerGroup(groupId: string, shortcuts: KeyboardShortcut[], optionsOrActiveUntil?: KeyboardShortcutGroupOptions | KeyboardShortcutActiveUntil): void {
     // Parse parameters - support both old (activeUntil) and new (options) formats
     let options: KeyboardShortcutGroupOptions;
-    if (optionsOrActiveUntil && (typeof optionsOrActiveUntil === 'object') && ('filter' in optionsOrActiveUntil || 'activeUntil' in optionsOrActiveUntil)) {
+    if (isGroupOptions(optionsOrActiveUntil)) {
       // New format with options object
-      options = optionsOrActiveUntil as KeyboardShortcutGroupOptions;
+      options = optionsOrActiveUntil;
     } else {
       // Old format with just activeUntil parameter
       options = { activeUntil: optionsOrActiveUntil as KeyboardShortcutActiveUntil };
@@ -640,13 +669,13 @@ export class KeyboardShortcuts implements OnDestroy {
         const normalizedSteps = this.normalizeToSteps(steps as KeyStep[] | string[]);
         const expected = normalizedSteps[pending.stepIndex];
 
-        // Use per-event pressed keys for advancing sequence steps. Relying on
-        // the accumulated `currentlyDownKeys` can accidentally include keys
-        // from previous steps (if tests or callers don't emit keyup), which
-        // would prevent matching a simple single-key step like ['s'] after
-        // a prior ['k'] step. Use getPressedKeys(event) which reflects the
-        // actual modifier/main-key state for this event.
-        const stepPressed = this.getPressedKeys(event);
+  // Use per-event pressed keys for advancing sequence steps. Relying on
+  // the accumulated `currentlyDownKeys` can accidentally include keys
+  // from previous steps (if tests or callers don't emit keyup), which
+  // would prevent matching a simple single-key step like ['s'] after
+  // a prior ['k'] step. Use getPressedKeys(event) which reflects the
+  // actual modifier/main-key state for this event as a Set<string>.
+  const stepPressed = this.getPressedKeys(event);
 
         if (expected && this.keysMatch(stepPressed, expected)) {
           // Advance sequence
@@ -706,8 +735,9 @@ export class KeyboardShortcuts implements OnDestroy {
       // expected step: if it requires multiple non-modifier keys, treat it as
       // a chord and use accumulated keys; otherwise use per-event keys to avoid
       // interference from previously pressed non-modifier keys.
-      const nonModifierCount = firstStep.filter(k => !['ctrl', 'alt', 'shift', 'meta'].includes(k.toLowerCase())).length;
-      const pressedForStep: Set<string> | string[] = nonModifierCount > 1
+  const nonModifierCount = firstStep.filter(k => !KeyboardShortcuts.MODIFIER_KEYS.has(k.toLowerCase())).length;
+      // Normalize pressed keys to a Set<string> for consistent typing
+      const pressedForStep: Set<string> = nonModifierCount > 1
         ? this.buildPressedKeysForMatch(event)
         : this.getPressedKeys(event);
 
@@ -748,7 +778,7 @@ export class KeyboardShortcuts implements OnDestroy {
   protected handleKeyup(event: KeyboardEvent): void {
     // Remove the key from currentlyDownKeys on keyup
     const key = event.key ? event.key.toLowerCase() : '';
-    if (key && !['control', 'alt', 'shift', 'meta'].includes(key)) {
+    if (key && !KeyboardShortcuts.MODIFIER_KEYS.has(key)) {
       this.currentlyDownKeys.delete(key);
     }
   }
@@ -787,7 +817,7 @@ export class KeyboardShortcuts implements OnDestroy {
     const key = event.key ? event.key.toLowerCase() : '';
 
     // Ignore modifier-only keydown entries
-    if (['control', 'alt', 'shift', 'meta'].includes(key)) {
+    if (KeyboardShortcuts.MODIFIER_KEYS.has(key)) {
       return;
     }
 
@@ -832,8 +862,8 @@ export class KeyboardShortcuts implements OnDestroy {
     if (event.shiftKey) modifiers.add('shift');
     if (event.metaKey) modifiers.add('meta');
 
-    // Collect non-modifier keys from currentlyDownKeys (excluding modifiers)
-    const nonModifierKeys = Array.from(this.currentlyDownKeys).filter(k => !['control', 'alt', 'shift', 'meta'].includes(k));
+  // Collect non-modifier keys from currentlyDownKeys (excluding modifiers)
+  const nonModifierKeys = Array.from(this.currentlyDownKeys).filter(k => !KeyboardShortcuts.MODIFIER_KEYS.has(k));
 
     const result = new Set<string>();
     // Add modifiers first
@@ -846,27 +876,31 @@ export class KeyboardShortcuts implements OnDestroy {
 
     // Fallback: single main key from the event (existing behavior)
     const key = event.key.toLowerCase();
-    if (!['control', 'alt', 'shift', 'meta'].includes(key)) {
+    if (!KeyboardShortcuts.MODIFIER_KEYS.has(key)) {
       result.add(key);
     }
     return result;
   }
 
-  protected getPressedKeys(event: KeyboardEvent): string[] {
-    const keys: string[] = [];
+  /**
+   * Return the pressed keys for this event as a Set<string>.
+   * This is the canonical internal API used for matching.
+   */
+  protected getPressedKeys(event: KeyboardEvent): Set<string> {
+    const result = new Set<string>();
 
-    if (event.ctrlKey) keys.push('ctrl');
-    if (event.altKey) keys.push('alt');
-    if (event.shiftKey) keys.push('shift');
-    if (event.metaKey) keys.push('meta');
+    if (event.ctrlKey) result.add('ctrl');
+    if (event.altKey) result.add('alt');
+    if (event.shiftKey) result.add('shift');
+    if (event.metaKey) result.add('meta');
 
-    // Add the main key (normalize to lowercase)
-    const key = event.key.toLowerCase();
-    if (!['control', 'alt', 'shift', 'meta'].includes(key)) {
-      keys.push(key);
+    // Add the main key (normalize to lowercase) if it's not a modifier
+    const key = (event.key ?? '').toLowerCase();
+    if (key && !KeyboardShortcuts.MODIFIER_KEYS.has(key)) {
+      result.add(key);
     }
 
-    return keys;
+    return result;
   }
 
   /**
@@ -932,9 +966,9 @@ export class KeyboardShortcuts implements OnDestroy {
     // Support both real DestroyRef instances and duck-typed objects (e.g.,
     // Jasmine spies) that expose an onDestroy(fn) method for backwards
     // compatibility with earlier APIs and tests.
-    if ((activeUntil as any) instanceof DestroyRef || typeof (activeUntil as any).onDestroy === 'function') {
-      (activeUntil as any).onDestroy(unregister);
-      return
+    if (isDestroyRefLike(activeUntil)) {
+      activeUntil.onDestroy(unregister);
+      return;
     }
 
     if (activeUntil instanceof Observable) {
