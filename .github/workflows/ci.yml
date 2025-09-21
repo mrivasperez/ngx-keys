@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, feat/refactor-tests ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+
+    strategy:
+      matrix:
+        node-version: ['lts/*']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run headless unit tests
+        run: npm run test:ci
+
+      - name: Upload coverage (optional)
+        if: success() && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage || coverage/
