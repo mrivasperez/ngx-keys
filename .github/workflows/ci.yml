@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, feat/refactor-tests ]
+    branches: [main, feat/refactor-tests]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   test:
@@ -31,10 +31,3 @@ jobs:
 
       - name: Run headless unit tests
         run: npm run test:ci
-
-      - name: Upload coverage (optional)
-        if: success() && always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage || coverage/
