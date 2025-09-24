@@ -730,6 +730,157 @@ this.keyboardService.register({
 });
 ```
 
+### Event Filtering
+
+You can configure which keyboard events should be processed by setting a filter function. This is useful for ignoring shortcuts when users are typing in input fields, text areas, or other form elements.
+
+> [!NOTE]
+> **No Default Filtering**: ngx-keys processes ALL keyboard events by default. This gives you maximum flexibility - some apps want shortcuts to work everywhere, others want to exclude form inputs. You decide!
+
+#### Named filters (recommended)
+
+For efficiency and control, prefer named global filters. You can toggle them on/off without replacing others, and ngx-keys evaluates them only once per keydown event (fast path), short‑circuiting further work when blocked.
+
+```typescript
+// Add named filters
+keyboardService.addFilter('forms', (event) => {
+  const t = event.target as HTMLElement | null;
+  const tag = t?.tagName?.toLowerCase();
+  return !(['input', 'textarea', 'select'].includes(tag ?? '')) && !t?.isContentEditable;
+});
+
+keyboardService.addFilter('modal-scope', (event) => {
+  const t = event.target as HTMLElement | null;
+  return !!t?.closest('.modal');
+});
+
+// Remove/toggle when context changes
+keyboardService.removeFilter('modal-scope');
+
+// Inspect and manage
+keyboardService.getFilterNames(); // ['forms']
+keyboardService.clearFilters();   // remove all
+```
+
+```typescript
+import { Component, inject } from '@angular/core';
+import { KeyboardShortcuts, KeyboardShortcutFilter } from 'ngx-keys';
+
+export class FilterExampleComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+
+  constructor() {
+    // Set up shortcuts
+    this.keyboardService.register({
+      id: 'save',
+      keys: ['ctrl', 's'],
+      macKeys: ['meta', 's'],
+      action: () => this.save(),
+      description: 'Save document'
+    });
+
+    // Configure filtering to ignore form elements
+    this.setupInputFiltering();
+  }
+
+  private setupInputFiltering() {
+    const inputFilter: KeyboardShortcutFilter = (event) => {
+      const target = event.target as HTMLElement;
+      const tagName = target?.tagName?.toLowerCase();
+      return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
+    };
+
+    // Use named filter for toggling
+    this.keyboardService.addFilter('forms', inputFilter);
+  }
+
+  private save() {
+    console.log('Document saved!');
+  }
+}
+```
+
+#### Common Filter Patterns
+
+**Ignore form elements:**
+```typescript
+const formFilter: KeyboardShortcutFilter = (event) => {
+  const target = event.target as HTMLElement;
+  const tagName = target?.tagName?.toLowerCase();
+  return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
+};
+
+keyboardService.addFilter('forms', formFilter);
+```
+
+**Ignore elements with specific attributes:**
+```typescript
+const attributeFilter: KeyboardShortcutFilter = (event) => {
+  const target = event.target as HTMLElement;
+  return !target?.hasAttribute('data-no-shortcuts');
+};
+
+keyboardService.addFilter('no-shortcuts-attr', attributeFilter);
+```
+
+**Complex conditional filtering:**
+```typescript
+const conditionalFilter: KeyboardShortcutFilter = (event) => {
+  const target = event.target as HTMLElement;
+  
+  // Allow shortcuts in code editors (even though they're contentEditable)
+  if (target?.classList?.contains('code-editor')) {
+    return true;
+  }
+  
+  // Block shortcuts in form elements
+  if (target?.tagName?.match(/INPUT|TEXTAREA|SELECT/i) || target?.isContentEditable) {
+    return false;
+  }
+  
+  return true;
+};
+
+keyboardService.addFilter('conditional', conditionalFilter);
+```
+
+**Remove filtering:**
+```typescript
+// Remove a specific named filter
+keyboardService.removeFilter('forms');
+// Or remove all
+keyboardService.clearFilters();
+```
+
+#### Example: Modal Context Filtering
+
+```typescript
+export class ModalComponent {
+  constructor() {
+    // When modal opens, only allow modal-specific shortcuts
+    this.keyboardService.addFilter('modal-scope', (event) => {
+      const target = event.target as HTMLElement;
+      
+      // Only process events within the modal
+      return target?.closest('.modal') !== null;
+    });
+  }
+
+  onClose() {
+    // Restore normal filtering when modal closes
+    this.keyboardService.removeFilter('modal-scope');
+  }
+}
+```
+
+#### Performance tips
+
+- Filters are evaluated once per keydown before scanning shortcuts. If any global filter returns false, ngx-keys exits early and clears pending sequences.
+- Group-level filters are precomputed once per event; shortcuts in blocked groups are skipped without key matching.
+- Keep filters cheap and synchronous. Prefer reading event.target properties (tagName, isContentEditable, classList) over layout-triggering queries.
+- Use named filters to toggle contexts (modals, editors) without allocating new closures per interaction.
+- Avoid complex DOM traversals inside filters; if needed, memoize simple queries or use attributes (e.g., data-no-shortcuts).
+
 ## Building
 
 To build the library:
