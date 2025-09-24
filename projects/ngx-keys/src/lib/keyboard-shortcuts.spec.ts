@@ -25,8 +25,8 @@ describe('KeyboardShortcuts', () => {
     id: 'test-shortcut',
     keys: ['ctrl', 's'],
     macKeys: ['meta', 's'],
-    action: () => { },
-    description: 'Test shortcut'
+    action: () => {},
+    description: 'Test shortcut',
   };
 
   beforeEach(() => {
@@ -43,7 +43,11 @@ describe('KeyboardShortcuts', () => {
     // afterNextRender). Calling the private startListening here ensures our
     // dispatched DOM events are picked up during tests.
     if ((service as any).startListening) {
-      try { (service as any).startListening(); } catch { /* ignore */ }
+      try {
+        (service as any).startListening();
+      } catch {
+        /* ignore */
+      }
     }
     mockAction = jasmine.createSpy('mockAction');
   });
@@ -73,7 +77,7 @@ describe('KeyboardShortcuts', () => {
         id: 'test-shortcut',
         keys: 'Ctrl+S',
         macKeys: '⌘+S',
-        description: 'Test shortcut'
+        description: 'Test shortcut',
       });
     });
 
@@ -89,20 +93,24 @@ describe('KeyboardShortcuts', () => {
 
     it('should update shortcuts$ signal with all registered shortcuts', () => {
       const shortcut1 = { ...mockShortcut, id: 'shortcut-1', action: mockAction };
-      const shortcut2 = { ...mockShortcut, id: 'shortcut-2', keys: ['ctrl', 'c'], macKeys: ['meta', 'c'], action: mockAction };
+      const shortcut2 = {
+        ...mockShortcut,
+        id: 'shortcut-2',
+        keys: ['ctrl', 'c'],
+        macKeys: ['meta', 'c'],
+        action: mockAction,
+      };
 
       service.register(shortcut1);
       service.register(shortcut2);
 
       expect(service.shortcuts$().all.length).toBe(2);
-      expect(service.shortcuts$().all.map(s => s.id)).toContain('shortcut-1');
-      expect(service.shortcuts$().all.map(s => s.id)).toContain('shortcut-2');
+      expect(service.shortcuts$().all.map((s) => s.id)).toContain('shortcut-1');
+      expect(service.shortcuts$().all.map((s) => s.id)).toContain('shortcut-2');
     });
 
     it('should update group signals', () => {
-      const shortcuts = [
-        { ...mockShortcut, id: 'shortcut-1', action: mockAction }
-      ];
+      const shortcuts = [{ ...mockShortcut, id: 'shortcut-1', action: mockAction }];
 
       service.registerGroup('test-group', shortcuts);
       expect(service.shortcuts$().groups.active).toContain('test-group');
@@ -165,7 +173,7 @@ describe('KeyboardShortcuts', () => {
           macKeys: ['f3'],
           action: mockAction,
           description: 'Test no activeUntil',
-          activeUntil: undefined
+          activeUntil: undefined,
         };
 
         expect(() => service.register(shortcut)).not.toThrow();
@@ -182,7 +190,7 @@ describe('KeyboardShortcuts', () => {
           macKeys: ['f4'],
           action: mockAction,
           description: 'Test destruct',
-          activeUntil: 'destruct'
+          activeUntil: 'destruct',
         });
 
         localService.register(shortcut);
@@ -203,16 +211,24 @@ describe('KeyboardShortcuts', () => {
         if (RealDestroyRef) {
           class LocalFake extends RealDestroyRef {
             private cb: (() => void) | null = null;
-            onDestroy(fn: () => void) { this.cb = fn; }
-            trigger() { if (this.cb) this.cb(); }
+            onDestroy(fn: () => void) {
+              this.cb = fn;
+            }
+            trigger() {
+              if (this.cb) this.cb();
+            }
           }
           instance = new LocalFake();
         } else {
           // Fallback: use a plain object that will still match the instanceof check in some environments
           instance = {
             cb: null as any,
-            onDestroy(fn: () => void) { this.cb = fn; },
-            trigger() { if (this.cb) this.cb(); }
+            onDestroy(fn: () => void) {
+              this.cb = fn;
+            },
+            trigger() {
+              if (this.cb) this.cb();
+            },
           };
           // Try to set prototype to mimic DestroyRef if available
           if ((ngCore as any).DestroyRef && (ngCore as any).DestroyRef.prototype) {
@@ -226,7 +242,7 @@ describe('KeyboardShortcuts', () => {
           macKeys: ['f5'],
           action: mockAction,
           description: 'Test destroyref instance',
-          activeUntil: instance
+          activeUntil: instance,
         } as any;
 
         service.register(shortcut);
@@ -247,7 +263,7 @@ describe('KeyboardShortcuts', () => {
           macKeys: ['f6'],
           action: mockAction,
           description: 'Test observable',
-          activeUntil: obs
+          activeUntil: obs,
         });
 
         service.register(shortcut);
@@ -332,8 +348,8 @@ describe('KeyboardShortcuts', () => {
             keys: ['f7'],
             macKeys: ['f7'],
             action: mockAction,
-            description: 'Test'
-          }
+            description: 'Test',
+          },
         ];
 
         expect(() => service.registerGroup('group-no-activeuntil', shortcuts)).not.toThrow();
@@ -350,8 +366,8 @@ describe('KeyboardShortcuts', () => {
             keys: ['f8'],
             macKeys: ['f8'],
             action: mockAction,
-            description: 'Test'
-          }
+            description: 'Test',
+          },
         ];
 
         localService.registerGroup('group-destruct', shortcuts, 'destruct' as any);
@@ -369,15 +385,23 @@ describe('KeyboardShortcuts', () => {
         if (RealDestroyRef) {
           class LocalFake extends RealDestroyRef {
             private cb: (() => void) | null = null;
-            onDestroy(fn: () => void) { this.cb = fn; }
-            trigger() { if (this.cb) this.cb(); }
+            onDestroy(fn: () => void) {
+              this.cb = fn;
+            }
+            trigger() {
+              if (this.cb) this.cb();
+            }
           }
           instance = new LocalFake();
         } else {
           instance = {
             cb: null as any,
-            onDestroy(fn: () => void) { this.cb = fn; },
-            trigger() { if (this.cb) this.cb(); }
+            onDestroy(fn: () => void) {
+              this.cb = fn;
+            },
+            trigger() {
+              if (this.cb) this.cb();
+            },
           };
           if ((ngCore as any).DestroyRef && (ngCore as any).DestroyRef.prototype) {
             Object.setPrototypeOf(instance, (ngCore as any).DestroyRef.prototype);
@@ -390,8 +414,8 @@ describe('KeyboardShortcuts', () => {
             keys: ['f9'],
             macKeys: ['f9'],
             action: mockAction,
-            description: 'Test'
-          }
+            description: 'Test',
+          },
         ];
 
         service.registerGroup('group-dref', shortcuts, instance);
@@ -411,8 +435,8 @@ describe('KeyboardShortcuts', () => {
             keys: ['f10'],
             macKeys: ['f10'],
             action: mockAction,
-            description: 'Test'
-          }
+            description: 'Test',
+          },
         ];
 
         service.registerGroup('group-obs', shortcuts, obs as any);
@@ -428,7 +452,7 @@ describe('KeyboardShortcuts', () => {
         ...mockShortcut,
         keys: ['ctrl', 'shift', 'a'],
         macKeys: ['meta', 'shift', 'a'],
-        action: mockAction
+        action: mockAction,
       };
       service.register(shortcut);
 
@@ -441,7 +465,7 @@ describe('KeyboardShortcuts', () => {
         ...mockShortcut,
         keys: ['ctrl', 'alt', 'shift', 'a'],
         macKeys: ['meta', 'alt', 'shift', 'a'],
-        action: mockAction
+        action: mockAction,
       };
       service.register(shortcut);
 
@@ -454,7 +478,7 @@ describe('KeyboardShortcuts', () => {
         ...mockShortcut,
         keys: ['unknown', 'x'],
         macKeys: ['unknown', 'x'],
-        action: mockAction
+        action: mockAction,
       };
       service.register(shortcut);
 
@@ -469,14 +493,14 @@ describe('KeyboardShortcuts', () => {
         id: 'cmd-test',
         keys: ['cmd', 's'],
         macKeys: ['cmd', 's'],
-        action: mockAction
+        action: mockAction,
       };
       const shortcut2 = {
         ...mockShortcut,
         id: 'command-test',
         keys: ['command', 'c'],
         macKeys: ['command', 'c'],
-        action: mockAction
+        action: mockAction,
       };
 
       service.register(shortcut1);
@@ -499,21 +523,23 @@ describe('KeyboardShortcuts', () => {
     it('should detect and match a chord of two non-modifier keys', () => {
       // Register a chord shortcut using our utility
       const chordAction = jasmine.createSpy('chordAction');
-      service.register(createMockShortcut({
-        id: 'chord-ca',
-        keys: ['c', 'a'],
-        macKeys: ['c', 'a'],
-        action: chordAction,
-        description: 'Chord C+A'
-      }));
+      service.register(
+        createMockShortcut({
+          id: 'chord-ca',
+          keys: ['c', 'a'],
+          macKeys: ['c', 'a'],
+          action: chordAction,
+          description: 'Chord C+A',
+        })
+      );
 
-  // Simulate keydown for 'c' using our utility
-  const eventC = createKeyboardEvent({ key: 'c' });
-  dispatchKeyEvent(eventC);
+      // Simulate keydown for 'c' using our utility
+      const eventC = createKeyboardEvent({ key: 'c' });
+      dispatchKeyEvent(eventC);
 
-  // Simulate keydown for 'a' while 'c' is still down
-  const eventA = createKeyboardEvent({ key: 'a' });
-  dispatchKeyEvent(eventA);
+      // Simulate keydown for 'a' while 'c' is still down
+      const eventA = createKeyboardEvent({ key: 'a' });
+      dispatchKeyEvent(eventA);
 
       // The chord action should have been executed when the second key was pressed
       expect(chordAction).toHaveBeenCalled();
@@ -521,16 +547,18 @@ describe('KeyboardShortcuts', () => {
 
     it('should not falsely match chord when only one key is pressed', () => {
       const chordAction = jasmine.createSpy('chordAction2');
-      service.register(createMockShortcut({
-        id: 'chord-xy',
-        keys: ['x', 'y'],
-        macKeys: ['x', 'y'],
-        action: chordAction,
-        description: 'Chord X+Y'
-      }));
+      service.register(
+        createMockShortcut({
+          id: 'chord-xy',
+          keys: ['x', 'y'],
+          macKeys: ['x', 'y'],
+          action: chordAction,
+          description: 'Chord X+Y',
+        })
+      );
 
-  const eventX = createKeyboardEvent({ key: 'x' });
-  dispatchKeyEvent(eventX);
+      const eventX = createKeyboardEvent({ key: 'x' });
+      dispatchKeyEvent(eventX);
 
       // Only one key down - should not trigger
       expect(chordAction).not.toHaveBeenCalled();
@@ -538,77 +566,85 @@ describe('KeyboardShortcuts', () => {
 
     it('should clear currently-down keys and prevent stale chord matches', () => {
       const chordAction = jasmine.createSpy('chordActionClear');
-      service.register(createMockShortcut({
-        id: 'chord-clear',
-        keys: ['m', 'n'],
-        macKeys: ['m', 'n'],
-        action: chordAction,
-        description: 'Chord M+N'
-      }));
+      service.register(
+        createMockShortcut({
+          id: 'chord-clear',
+          keys: ['m', 'n'],
+          macKeys: ['m', 'n'],
+          action: chordAction,
+          description: 'Chord M+N',
+        })
+      );
 
       // Simulate m down using our utility
-  const eventM = createKeyboardEvent({ key: 'm' });
-  dispatchKeyEvent(eventM);
+      const eventM = createKeyboardEvent({ key: 'm' });
+      dispatchKeyEvent(eventM);
 
       // Now simulate window blur/visibility change by calling the clear method
-  service.clearCurrentlyDownKeys();
+      service.clearCurrentlyDownKeys();
 
-  // Simulate n down — chord should not trigger because the state was cleared
-  const eventN = createKeyboardEvent({ key: 'n' });
-  dispatchKeyEvent(eventN);
+      // Simulate n down — chord should not trigger because the state was cleared
+      const eventN = createKeyboardEvent({ key: 'n' });
+      dispatchKeyEvent(eventN);
 
       expect(chordAction).not.toHaveBeenCalled();
     });
 
     it('should handle chord with three non-modifier keys', () => {
       const chordAction = jasmine.createSpy('tripleChordAction');
-      service.register(createMockShortcut({
-        id: 'chord-abc',
-        keys: ['a', 'b', 'c'],
-        macKeys: ['a', 'b', 'c'],
-        action: chordAction,
-        description: 'Chord A+B+C'
-      }));
+      service.register(
+        createMockShortcut({
+          id: 'chord-abc',
+          keys: ['a', 'b', 'c'],
+          macKeys: ['a', 'b', 'c'],
+          action: chordAction,
+          description: 'Chord A+B+C',
+        })
+      );
 
       // Press all three keys in sequence
-  dispatchKeyEvent(createKeyboardEvent({ key: 'a' }));
-  dispatchKeyEvent(createKeyboardEvent({ key: 'b' }));
-  dispatchKeyEvent(createKeyboardEvent({ key: 'c' }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'a' }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'b' }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'c' }));
 
       expect(chordAction).toHaveBeenCalled();
     });
 
     it('should handle chord with modifiers and non-modifier keys combined', () => {
       const chordAction = jasmine.createSpy('modifierChordAction');
-      service.register(createMockShortcut({
-        id: 'chord-ctrl-ab',
-        keys: ['ctrl', 'a', 'b'],
-        macKeys: ['meta', 'a', 'b'],
-        action: chordAction,
-        description: 'Chord Ctrl+A+B'
-      }));
+      service.register(
+        createMockShortcut({
+          id: 'chord-ctrl-ab',
+          keys: ['ctrl', 'a', 'b'],
+          macKeys: ['meta', 'a', 'b'],
+          action: chordAction,
+          description: 'Chord Ctrl+A+B',
+        })
+      );
 
       // Press ctrl, then a, then b
-  dispatchKeyEvent(createKeyboardEvent({ key: 'a', ctrlKey: true }));
-  dispatchKeyEvent(createKeyboardEvent({ key: 'b', ctrlKey: true }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'a', ctrlKey: true }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'b', ctrlKey: true }));
 
       expect(chordAction).toHaveBeenCalled();
     });
 
     it('should not trigger chord when keys are pressed in wrong combination', () => {
       const chordAction = jasmine.createSpy('wrongOrderAction');
-      service.register(createMockShortcut({
-        id: 'chord-precise',
-        keys: ['p', 'q'],
-        macKeys: ['p', 'q'],
-        action: chordAction,
-        description: 'Chord P+Q'
-      }));
+      service.register(
+        createMockShortcut({
+          id: 'chord-precise',
+          keys: ['p', 'q'],
+          macKeys: ['p', 'q'],
+          action: chordAction,
+          description: 'Chord P+Q',
+        })
+      );
 
       // Press only p, then release without pressing q
-  dispatchKeyEvent(createKeyboardEvent({ key: 'p' }));
-  // Simulate some other key being pressed instead
-  dispatchKeyEvent(createKeyboardEvent({ key: 'r' }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'p' }));
+      // Simulate some other key being pressed instead
+      dispatchKeyEvent(createKeyboardEvent({ key: 'r' }));
 
       expect(chordAction).not.toHaveBeenCalled();
     });
@@ -617,44 +653,46 @@ describe('KeyboardShortcuts', () => {
       const chordAction1 = jasmine.createSpy('chord1Action');
       const chordAction2 = jasmine.createSpy('chord2Action');
 
-      service.register(createMockShortcut({
-        id: 'chord-first',
-        keys: ['j', 'k'],
-        macKeys: ['j', 'k'],
-        action: chordAction1,
-        description: 'Chord J+K'
-      }));
+      service.register(
+        createMockShortcut({
+          id: 'chord-first',
+          keys: ['j', 'k'],
+          macKeys: ['j', 'k'],
+          action: chordAction1,
+          description: 'Chord J+K',
+        })
+      );
 
-      service.register(createMockShortcut({
-        id: 'chord-second',
-        keys: ['l', 'm'],
-        macKeys: ['l', 'm'],
-        action: chordAction2,
-        description: 'Chord L+M'
-      }));
+      service.register(
+        createMockShortcut({
+          id: 'chord-second',
+          keys: ['l', 'm'],
+          macKeys: ['l', 'm'],
+          action: chordAction2,
+          description: 'Chord L+M',
+        })
+      );
 
       // Trigger first chord
-  dispatchKeyEvent(createKeyboardEvent({ key: 'j' }));
-  dispatchKeyEvent(createKeyboardEvent({ key: 'k' }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'j' }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'k' }));
 
       expect(chordAction1).toHaveBeenCalled();
       expect(chordAction2).not.toHaveBeenCalled();
 
       // Clear currently pressed keys to ensure clean state for second chord
-  service.clearCurrentlyDownKeys();
+      service.clearCurrentlyDownKeys();
 
       // Reset spy calls and trigger second chord
       chordAction1.calls.reset();
       chordAction2.calls.reset();
 
-  dispatchKeyEvent(createKeyboardEvent({ key: 'l' }));
-  dispatchKeyEvent(createKeyboardEvent({ key: 'm' }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'l' }));
+      dispatchKeyEvent(createKeyboardEvent({ key: 'm' }));
 
       expect(chordAction1).not.toHaveBeenCalled();
       expect(chordAction2).toHaveBeenCalled();
     });
-
-    // Internal matching logic is covered indirectly via behavioral tests above
   });
 
   describe('Keyboard Event Handling', () => {
@@ -672,7 +710,7 @@ describe('KeyboardShortcuts', () => {
       const shortcut = createMockShortcut({
         keys: ['ctrl', 's'],
         macKeys: ['meta', 's'],
-        action: macAction
+        action: macAction,
       });
       service.register(shortcut);
 
@@ -691,7 +729,7 @@ describe('KeyboardShortcuts', () => {
 
       const event = new KeyboardEvent('keydown', {
         ctrlKey: true,
-        key: 's'
+        key: 's',
       });
 
       dispatchKeyEvent(event);
@@ -702,12 +740,24 @@ describe('KeyboardShortcuts', () => {
       const action1 = jasmine.createSpy('action1');
       const action2 = jasmine.createSpy('action2');
 
-      service.register({ ...mockShortcut, id: 'shortcut-1', keys: ['ctrl', 'x'], macKeys: ['meta', 'x'], action: action1 });
-      service.register({ ...mockShortcut, id: 'shortcut-2', keys: ['ctrl', 'y'], macKeys: ['meta', 'y'], action: action2 });
+      service.register({
+        ...mockShortcut,
+        id: 'shortcut-1',
+        keys: ['ctrl', 'x'],
+        macKeys: ['meta', 'x'],
+        action: action1,
+      });
+      service.register({
+        ...mockShortcut,
+        id: 'shortcut-2',
+        keys: ['ctrl', 'y'],
+        macKeys: ['meta', 'y'],
+        action: action2,
+      });
 
       const event = new KeyboardEvent('keydown', {
         ctrlKey: true,
-        key: 'x'
+        key: 'x',
       });
 
       dispatchKeyEvent(event);
@@ -722,7 +772,7 @@ describe('KeyboardShortcuts', () => {
         steps: [['ctrl', 'k'], ['s']],
         macSteps: [['meta', 'k'], ['s']],
         action: multiAction,
-        description: 'Multi-step timeout'
+        description: 'Multi-step timeout',
       } as any as KeyboardShortcut;
 
       service.register(shortcut);
@@ -772,16 +822,16 @@ describe('KeyboardShortcuts', () => {
         action,
       });
 
-    service.register(shortcut);
+      service.register(shortcut);
 
-    // Start the sequence by sending the first step
-    dispatchKeyEvent(KeyboardEvents.ctrlK());
+      // Start the sequence by sending the first step
+      dispatchKeyEvent(KeyboardEvents.ctrlK());
 
-  // Simulate window blur which should clear the pending sequence
-  dispatchWindowBlur();
+      // Simulate window blur which should clear the pending sequence
+      dispatchWindowBlur();
 
-  // Send the second step - action should NOT be called because sequence was cleared
-  dispatchKeyEvent(KeyboardEvents.plain('s'));
+      // Send the second step - action should NOT be called because sequence was cleared
+      dispatchKeyEvent(KeyboardEvents.plain('s'));
 
       expect(action).not.toHaveBeenCalled();
     });
@@ -789,7 +839,7 @@ describe('KeyboardShortcuts', () => {
 
   describe('Error Handling', () => {
     it('should handle errors in shortcut actions gracefully', () => {
-  const errorAction = jasmine.createSpy('errorAction').and.throwError('Test error');
+      const errorAction = jasmine.createSpy('errorAction').and.throwError('Test error');
       const consoleErrorSpy = spyOn(console, 'error');
 
       const shortcut = { ...mockShortcut, action: errorAction };
@@ -798,7 +848,7 @@ describe('KeyboardShortcuts', () => {
       // Simulate key press handling
       const event = new KeyboardEvent('keydown', {
         ctrlKey: true,
-        key: 's'
+        key: 's',
       });
 
       expect(() => dispatchKeyEvent(event)).not.toThrow();
@@ -846,8 +896,8 @@ describe('KeyboardShortcuts', () => {
           id: 'test-shortcut',
           keys: ['ctrl', 's'],
           macKeys: ['meta', 's'],
-          action: () => { },
-          description: 'Test shortcut'
+          action: () => {},
+          description: 'Test shortcut',
         };
 
         service.register(shortcut);
@@ -857,28 +907,99 @@ describe('KeyboardShortcuts', () => {
         );
       });
 
-      it('should throw error when registering shortcut with conflicting key combination', () => {
+      it('should throw error when registering shortcut with conflicting key combination with active shortcut', () => {
         service.register({ ...mockShortcut, id: 'shortcut-1' });
 
         const conflictingShortcut = {
           ...mockShortcut,
           id: 'shortcut-2',
-          keys: ['ctrl', 's'] // Conflict
+          keys: ['ctrl', 's'], // Conflict with active shortcut
         };
 
         expect(() => service.register(conflictingShortcut)).toThrowError(
-          KeyboardShortcutsErrors.KEY_CONFLICT('shortcut-1')
+          KeyboardShortcutsErrors.ACTIVE_KEY_CONFLICT('shortcut-1')
         );
       });
 
-      it('should throw error when registering group with duplicate group ID', () => {
-        const shortcuts: KeyboardShortcut[] = [{
-          id: 'shortcut1',
-          keys: ['f1'],
+      it('should allow registering shortcuts with same keys when original is inactive', () => {
+        service.register({ ...mockShortcut, id: 'shortcut-1' });
+        service.deactivate('shortcut-1'); // Make it inactive
+
+        const sameKeysShortcut = {
+          ...mockShortcut,
+          id: 'shortcut-2',
+          keys: ['ctrl', 's'], // Same keys but original is inactive
+          action: () => {},
+        };
+
+        // Should not throw
+        expect(() => service.register(sameKeysShortcut)).not.toThrow();
+        expect(service.shortcuts$().all.length).toBe(2);
+      });
+
+      it('should allow context-specific shortcuts with same keys', () => {
+        // Modal context shortcut (initially inactive)
+        const modalEscape = createMockShortcut({
+          id: 'modal-escape',
+          keys: ['escape'],
+          action: () => {},
+          description: 'Close modal',
+        });
+
+        service.register(modalEscape);
+        service.deactivate('modal-escape'); // Modal not shown initially
+
+        // Editor context shortcut
+        const editorEscape = createMockShortcut({
+          id: 'editor-escape',
+          keys: ['escape'], // Same key but different context
+          action: () => {},
+          description: 'Exit edit mode',
+        });
+
+        // Should allow since modal-escape is inactive
+        expect(() => service.register(editorEscape)).not.toThrow();
+
+        // Both should be registered
+        expect(service.shortcuts$().all.length).toBe(2);
+        expect(service.shortcuts$().active.length).toBe(1); // Only editor-escape is active
+      });
+
+      it('should allow alternative shortcuts for same action', () => {
+        const helpF1 = createMockShortcut({
+          id: 'help-f1',
+          keys: ['f1'], // Override default keys
           macKeys: ['f1'],
-          action: () => { },
-          description: 'Test'
-        }];
+          action: () => {},
+          description: 'Show help (F1)',
+        });
+
+        const helpCtrlH = createMockShortcut({
+          id: 'help-ctrl-h',
+          keys: ['ctrl', 'h'], // Different keys
+          macKeys: ['meta', 'h'],
+          action: () => {}, // Same action, different trigger
+          description: 'Show help (Ctrl+H)',
+        });
+
+        service.register(helpF1);
+        service.register(helpCtrlH);
+
+        // Both should be registered and active (no key conflict)
+        expect(service.shortcuts$().all.length).toBe(2);
+        expect(service.shortcuts$().active.length).toBe(2);
+      });
+
+      it('should throw error when registering group with duplicate group ID', () => {
+        const shortcuts: KeyboardShortcut[] = [
+          {
+            id: 'shortcut1',
+            keys: ['f1'],
+            macKeys: ['f1'],
+            action: () => {},
+            description: 'Test',
+          },
+        ];
 
         service.registerGroup('test-group', shortcuts);
 
@@ -892,19 +1013,21 @@ describe('KeyboardShortcuts', () => {
           id: 'duplicate-shortcut',
           keys: ['f1'],
           macKeys: ['f1'],
-          action: () => { },
-          description: 'Test'
+          action: () => {},
+          description: 'Test',
         };
 
         service.register(shortcut);
 
-        const groupShortcuts: KeyboardShortcut[] = [{
-          id: 'duplicate-shortcut',
-          keys: ['f2'],
-          macKeys: ['f2'],
-          action: () => { },
-          description: 'Duplicate'
-        }];
+        const groupShortcuts: KeyboardShortcut[] = [
+          {
+            id: 'duplicate-shortcut',
+            keys: ['f2'],
+            macKeys: ['f2'],
+            action: () => {},
+            description: 'Duplicate',
+          },
+        ];
 
         expect(() => service.registerGroup('new-group', groupShortcuts)).toThrowError(
           KeyboardShortcutsErrors.SHORTCUT_IDS_ALREADY_REGISTERED(['duplicate-shortcut'])
@@ -917,16 +1040,16 @@ describe('KeyboardShortcuts', () => {
             id: 'same-id',
             keys: ['f1'],
             macKeys: ['f1'],
-            action: () => { },
-            description: 'First'
+            action: () => {},
+            description: 'First',
           },
           {
             id: 'same-id',
             keys: ['f2'],
             macKeys: ['f2'],
-            action: () => { },
-            description: 'Second'
-          }
+            action: () => {},
+            description: 'Second',
+          },
         ];
 
         expect(() => service.registerGroup('group-with-duplicates', groupShortcuts)).toThrowError(
@@ -934,20 +1057,193 @@ describe('KeyboardShortcuts', () => {
         );
       });
 
-      it('should throw error when registering group with conflicting key combination', () => {
+      it('should throw error when registering group with conflicting key combination with active shortcut', () => {
         service.register({ ...mockShortcut, id: 'existing-shortcut', keys: ['ctrl', 'p'] });
 
-        const groupShortcuts: KeyboardShortcut[] = [{
-          id: 'new-shortcut',
-          keys: ['ctrl', 'p'], // Conflict
-          macKeys: ['meta', 'o'],
-          action: () => { },
-          description: 'New'
-        }];
+        const groupShortcuts: KeyboardShortcut[] = [
+          {
+            id: 'new-shortcut',
+            keys: ['ctrl', 'p'], // Conflict with active shortcut
+            macKeys: ['meta', 'o'],
+            action: () => {},
+            description: 'New',
+          },
+        ];
 
         expect(() => service.registerGroup('conflict-group', groupShortcuts)).toThrowError(
-          KeyboardShortcutsErrors.KEY_CONFLICTS_IN_GROUP(['"new-shortcut" conflicts with "existing-shortcut"'])
+          KeyboardShortcutsErrors.KEY_CONFLICTS_IN_GROUP([
+            '"new-shortcut" conflicts with active shortcut "existing-shortcut"',
+          ])
         );
+      });
+    });
+
+    describe('Activation Conflicts', () => {
+      it('should throw error when activating shortcut that would conflict with active shortcuts', () => {
+        const shortcut1 = createMockShortcut({
+          id: 'shortcut-1',
+          keys: ['ctrl', 's'],
+          action: () => {},
+        });
+
+        const shortcut2 = createMockShortcut({
+          id: 'shortcut-2',
+          keys: ['ctrl', 's'], // Same keys
+          action: () => {},
+        });
+
+        // Register both (shortcut-1 will be active, shortcut-2 inactive)
+        service.register(shortcut1);
+        service.deactivate('shortcut-1');
+        service.register(shortcut2); // This should work since shortcut-1 is inactive
+
+        // Now try to activate shortcut-1, which should fail due to conflict with active shortcut-2
+        expect(() => service.activate('shortcut-1')).toThrowError(
+          KeyboardShortcutsErrors.ACTIVATION_KEY_CONFLICT('shortcut-1', ['shortcut-2'])
+        );
+      });
+
+      it('should allow activating shortcut when conflicting shortcuts are inactive', () => {
+        const shortcut1 = createMockShortcut({
+          id: 'shortcut-1',
+          keys: ['ctrl', 's'],
+          action: () => {},
+        });
+
+        const shortcut2 = createMockShortcut({
+          id: 'shortcut-2',
+          keys: ['ctrl', 's'], // Same keys
+          action: () => {},
+        });
+
+        // Register shortcut-1 (will be active)
+        service.register(shortcut1);
+        service.deactivate('shortcut-1'); // Make it inactive
+
+        // Register shortcut-2 (will be active)
+        service.register(shortcut2);
+        service.deactivate('shortcut-2'); // Make it inactive too
+
+        // Now should be able to activate either one since the other is inactive
+        expect(() => service.activate('shortcut-1')).not.toThrow();
+        expect(service.isActive('shortcut-1')).toBe(true);
+        expect(service.isActive('shortcut-2')).toBe(false);
+      });
+
+      it('should handle feature toggle scenarios with same shortcut keys', () => {
+        const designModeSpace = createMockShortcut({
+          id: 'design-mode-space',
+          keys: ['space'],
+          action: () => {},
+          description: 'Toggle design element',
+        });
+
+        const playModeSpace = createMockShortcut({
+          id: 'play-mode-space',
+          keys: ['space'], // Same key
+          action: () => {},
+          description: 'Pause/resume playback',
+        });
+
+        // Register design mode shortcut (active by default)
+        service.register(designModeSpace);
+
+        // Deactivate design mode first to allow play mode registration
+        service.deactivate('design-mode-space');
+
+        // Register play mode shortcut (will be active since design mode is inactive)
+        service.register(playModeSpace);
+
+        // Verify the switch worked
+        expect(service.isActive('design-mode-space')).toBe(false);
+        expect(service.isActive('play-mode-space')).toBe(true);
+
+        // Test switching back
+        service.deactivate('play-mode-space');
+        expect(() => service.activate('design-mode-space')).not.toThrow();
+        expect(service.isActive('design-mode-space')).toBe(true);
+        expect(service.isActive('play-mode-space')).toBe(false);
+      });
+
+      it('should throw error when activating group that would create conflicts', () => {
+        // Register an active shortcut
+        service.register(
+          createMockShortcut({
+            id: 'existing-shortcut',
+            keys: ['ctrl', 's'],
+            macKeys: ['meta', 's'],
+            action: () => {},
+          })
+        );
+
+        // Create a group with conflicting shortcut but register when existing is inactive
+        service.deactivate('existing-shortcut'); // Make existing inactive first
+
+        const groupShortcuts = [
+          createMockShortcut({
+            id: 'group-shortcut-1',
+            keys: ['ctrl', 'a'],
+            macKeys: ['meta', 'a'],
+            action: () => {},
+          }),
+          createMockShortcut({
+            id: 'group-shortcut-2',
+            keys: ['ctrl', 's'], // Same as existing-shortcut but it's inactive
+            macKeys: ['meta', 's'],
+            action: () => {},
+          }),
+        ];
+
+        // Register the group (should work since existing-shortcut is inactive)
+        service.registerGroup('test-group', groupShortcuts);
+        service.deactivateGroup('test-group');
+
+        // Now reactivate the existing shortcut
+        service.activate('existing-shortcut');
+
+        // Trying to activate the group should fail due to conflict
+        expect(() => service.activateGroup('test-group')).toThrowError(
+          KeyboardShortcutsErrors.GROUP_ACTIVATION_KEY_CONFLICT('test-group', ['existing-shortcut'])
+        );
+      });
+
+      it('should allow activating group when no conflicts exist', () => {
+        // Register an active shortcut
+        service.register(
+          createMockShortcut({
+            id: 'existing-shortcut',
+            keys: ['ctrl', 's'],
+            macKeys: ['meta', 's'],
+            action: () => {},
+          })
+        );
+
+        // Create a group with non-conflicting shortcuts
+        const groupShortcuts = [
+          createMockShortcut({
+            id: 'group-shortcut-1',
+            keys: ['ctrl', 'a'], // Different from existing shortcut
+            macKeys: ['meta', 'a'],
+            action: () => {},
+          }),
+          createMockShortcut({
+            id: 'group-shortcut-2',
+            keys: ['ctrl', 'd'], // Different from existing shortcut
+            macKeys: ['meta', 'd'],
+            action: () => {},
+          }),
+        ];
+
+        // Register the group - should work since no conflicts
+        expect(() => service.registerGroup('test-group', groupShortcuts)).not.toThrow();
+
+        // Deactivate the group to test activation
+        service.deactivateGroup('test-group');
+
+        // Should be able to activate the group
+        expect(() => service.activateGroup('test-group')).not.toThrow();
+        expect(service.isActive('group-shortcut-1')).toBe(true);
+        expect(service.isActive('group-shortcut-2')).toBe(true);
       });
     });
 
@@ -995,8 +1291,8 @@ describe('KeyboardShortcuts', () => {
           id: 'check-shortcut',
           keys: ['f1'],
           macKeys: ['f1'],
-          action: () => { },
-          description: 'Test'
+          action: () => {},
+          description: 'Test',
         };
 
         expect(service.isRegistered('check-shortcut')).toBe(false);
@@ -1007,19 +1303,483 @@ describe('KeyboardShortcuts', () => {
       });
 
       it('should correctly check if group is registered', () => {
-        const shortcuts: KeyboardShortcut[] = [{
-          id: 'group-check-shortcut',
-          keys: ['f1'],
-          macKeys: ['f1'],
-          action: () => { },
-          description: 'Test'
-        }];
+        const shortcuts: KeyboardShortcut[] = [
+          {
+            id: 'group-check-shortcut',
+            keys: ['f1'],
+            macKeys: ['f1'],
+            action: () => {},
+            description: 'Test',
+          },
+        ];
 
         expect(service.isGroupRegistered('check-group')).toBe(false);
 
         service.registerGroup('check-group', shortcuts);
 
         expect(service.isGroupRegistered('check-group')).toBe(true);
+      });
+    });
+  });
+
+  describe('Filter Functionality', () => {
+    let mockAction: jasmine.Spy;
+    let testShortcut: KeyboardShortcut;
+
+    beforeEach(() => {
+      mockAction = jasmine.createSpy('mockAction');
+      testShortcut = {
+        id: 'test-filter',
+        keys: ['ctrl', 's'],
+        macKeys: ['meta', 's'],
+        action: mockAction,
+        description: 'Test shortcut for filter',
+      };
+      service.register(testShortcut);
+    });
+
+    describe('Named Global Filters', () => {
+      it('should add and get named filters', () => {
+        const filterFn = (event: KeyboardEvent) => true;
+
+        expect(service.hasFilter('test')).toBe(false);
+        expect(service.getFilter('test')).toBeUndefined();
+
+        service.addFilter('test', filterFn);
+
+        expect(service.hasFilter('test')).toBe(true);
+        expect(service.getFilter('test')).toBe(filterFn);
+      });
+
+      it('should remove named filters', () => {
+        const filterFn = (event: KeyboardEvent) => true;
+        service.addFilter('test', filterFn);
+
+        expect(service.hasFilter('test')).toBe(true);
+
+        const removed = service.removeFilter('test');
+
+        expect(removed).toBe(true);
+        expect(service.hasFilter('test')).toBe(false);
+        expect(service.getFilter('test')).toBeUndefined();
+      });
+
+      it('should return false when removing non-existent filter', () => {
+        const removed = service.removeFilter('non-existent');
+        expect(removed).toBe(false);
+      });
+
+      it('should get all filter names', () => {
+        expect(service.getFilterNames()).toEqual([]);
+
+        service.addFilter('filter1', () => true);
+        service.addFilter('filter2', () => false);
+
+        const names = service.getFilterNames();
+        expect(names).toContain('filter1');
+        expect(names).toContain('filter2');
+        expect(names.length).toBe(2);
+      });
+
+      it('should clear all filters', () => {
+        service.addFilter('filter1', () => true);
+        service.addFilter('filter2', () => false);
+
+        expect(service.getFilterNames().length).toBe(2);
+
+        service.clearFilters();
+
+        expect(service.getFilterNames()).toEqual([]);
+        expect(service.hasFilter('filter1')).toBe(false);
+        expect(service.hasFilter('filter2')).toBe(false);
+      });
+    });
+
+    describe('Global Filter Processing', () => {
+      it('should execute shortcut when no filters are set', () => {
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+
+        service.testHandleKeydown(event);
+
+        expect(mockAction).toHaveBeenCalled();
+      });
+
+      it('should execute shortcut when all global filters return true', () => {
+        service.addFilter('filter1', () => true);
+        service.addFilter('filter2', () => true);
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+
+        service.testHandleKeydown(event);
+
+        expect(mockAction).toHaveBeenCalled();
+      });
+
+      it('should not execute shortcut when any global filter returns false', () => {
+        service.addFilter('allow', () => true);
+        service.addFilter('block', () => false);
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+
+        service.testHandleKeydown(event);
+
+        expect(mockAction).not.toHaveBeenCalled();
+      });
+
+      it('should pass the keyboard event to all filter functions', () => {
+        const filter1Spy = jasmine.createSpy('filter1').and.returnValue(true);
+        const filter2Spy = jasmine.createSpy('filter2').and.returnValue(true);
+        service.addFilter('filter1', filter1Spy);
+        service.addFilter('filter2', filter2Spy);
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+
+        service.testHandleKeydown(event);
+
+        expect(filter1Spy).toHaveBeenCalledWith(event);
+        expect(filter2Spy).toHaveBeenCalledWith(event);
+        expect(mockAction).toHaveBeenCalled();
+      });
+
+      it('should work with input element filtering', () => {
+        // Create mock input element
+        const mockInput = {
+          tagName: 'INPUT',
+          isContentEditable: false,
+        } as HTMLElement;
+
+        const inputFilter = (event: KeyboardEvent) => {
+          const target = event.target as HTMLElement;
+          const tagName = target?.tagName?.toLowerCase();
+          return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
+        };
+
+        service.addFilter('inputs', inputFilter);
+
+        // Test with input element - should be filtered out
+        const inputEvent = createKeyboardEvent({ key: 's', ctrlKey: true });
+        // Mock the target property
+        Object.defineProperty(inputEvent, 'target', { value: mockInput, configurable: true });
+
+        service.testHandleKeydown(inputEvent);
+        expect(mockAction).not.toHaveBeenCalled();
+
+        // Reset spy for next test
+        mockAction.calls.reset();
+
+        // Test with div element - should work
+        const mockDiv = {
+          tagName: 'DIV',
+          isContentEditable: false,
+        } as HTMLElement;
+
+        const divEvent = createKeyboardEvent({ key: 's', ctrlKey: true });
+        Object.defineProperty(divEvent, 'target', { value: mockDiv, configurable: true });
+
+        service.testHandleKeydown(divEvent);
+        expect(mockAction).toHaveBeenCalled();
+      });
+
+      it('should work with contenteditable filtering', () => {
+        const mockEditableDiv = {
+          tagName: 'DIV',
+          isContentEditable: true,
+        } as HTMLElement;
+
+        const editableFilter = (event: KeyboardEvent) => {
+          const target = event.target as HTMLElement;
+          return !target?.isContentEditable;
+        };
+
+        service.addFilter('contenteditable', editableFilter);
+
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+        Object.defineProperty(event, 'target', { value: mockEditableDiv, configurable: true });
+
+        service.testHandleKeydown(event);
+
+        expect(mockAction).not.toHaveBeenCalled();
+      });
+
+      it('should allow filters to be added and removed dynamically', () => {
+        // Start with permissive filter
+        service.addFilter('test', () => true);
+        const event = createKeyboardEvent({ key: 's', ctrlKey: true });
+
+        service.testHandleKeydown(event);
+        expect(mockAction).toHaveBeenCalledTimes(1);
+
+        // Add restrictive filter
+        service.addFilter('block', () => false);
+
+        service.testHandleKeydown(event);
+        expect(mockAction).toHaveBeenCalledTimes(1); // Should not increase
+
+        // Remove restrictive filter
+        service.removeFilter('block');
+
+        service.testHandleKeydown(event);
+        expect(mockAction).toHaveBeenCalledTimes(2); // Should increase
+
+        // Remove all filters
+        service.clearFilters();
+
+        service.testHandleKeydown(event);
+        expect(mockAction).toHaveBeenCalledTimes(3); // Should increase
+      });
+    });
+
+    describe('Filter with multi-step shortcuts', () => {
+      let multiStepAction: jasmine.Spy;
+      let multiStepShortcut: KeyboardShortcut;
+
+      beforeEach(() => {
+        multiStepAction = jasmine.createSpy('multiStepAction');
+        multiStepShortcut = {
+          id: 'multi-step-filter',
+          steps: [['ctrl', 'k'], ['s']],
+          macSteps: [['meta', 'k'], ['s']],
+          action: multiStepAction,
+          description: 'Multi-step shortcut for filter testing',
+        };
+        service.register(multiStepShortcut);
+      });
+
+      it('should apply global filters to multi-step shortcuts', () => {
+        service.addFilter('block', () => false);
+
+        // Try to start sequence - should be blocked by filter
+        const firstStepEvent = createKeyboardEvent({ key: 'k', ctrlKey: true });
+        service.testHandleKeydown(firstStepEvent);
+
+        // Try second step
+        const secondStepEvent = createKeyboardEvent({ key: 's' });
+        service.testHandleKeydown(secondStepEvent);
+
+        expect(multiStepAction).not.toHaveBeenCalled();
+      });
+
+      it('should allow multi-step shortcuts when global filters permit', () => {
+        service.addFilter('allow', () => true);
+
+        // Start sequence
+        const firstStepEvent = createKeyboardEvent({ key: 'k', ctrlKey: true });
+        service.testHandleKeydown(firstStepEvent);
+
+        // Complete sequence
+        const secondStepEvent = createKeyboardEvent({ key: 's' });
+        service.testHandleKeydown(secondStepEvent);
+
+        expect(multiStepAction).toHaveBeenCalled();
+      });
+    });
+
+    describe('Per-Shortcut Filters', () => {
+      let perShortcutAction: jasmine.Spy;
+      let perShortcutShortcut: KeyboardShortcut;
+
+      beforeEach(() => {
+        perShortcutAction = jasmine.createSpy('perShortcutAction');
+        perShortcutShortcut = {
+          id: 'per-shortcut-filter',
+          keys: ['ctrl', 'p'],
+          macKeys: ['meta', 'p'],
+          action: perShortcutAction,
+          filter: (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement;
+            return target?.tagName?.toLowerCase() !== 'input';
+          },
+          description: 'Shortcut with per-shortcut filter',
+        };
+        service.register(perShortcutShortcut);
+      });
+
+      it('should execute shortcut when per-shortcut filter returns true', () => {
+        const mockDiv = { tagName: 'DIV' } as HTMLElement;
+        const event = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(event, 'target', { value: mockDiv, configurable: true });
+
+        service.testHandleKeydown(event);
+
+        expect(perShortcutAction).toHaveBeenCalled();
+      });
+
+      it('should not execute shortcut when per-shortcut filter returns false', () => {
+        const mockInput = { tagName: 'INPUT' } as HTMLElement;
+        const event = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(event, 'target', { value: mockInput, configurable: true });
+
+        service.testHandleKeydown(event);
+
+        expect(perShortcutAction).not.toHaveBeenCalled();
+      });
+
+      it('should apply both global and per-shortcut filters', () => {
+        // Add global filter that blocks buttons
+        service.addFilter('buttons', (event) => {
+          const target = event.target as HTMLElement;
+          return target?.tagName?.toLowerCase() !== 'button';
+        });
+
+        // Test with button (blocked by global filter)
+        const mockButton = { tagName: 'BUTTON' } as HTMLElement;
+        const buttonEvent = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(buttonEvent, 'target', { value: mockButton, configurable: true });
+
+        service.testHandleKeydown(buttonEvent);
+        expect(perShortcutAction).not.toHaveBeenCalled();
+
+        // Test with input (blocked by per-shortcut filter)
+        const mockInput = { tagName: 'INPUT' } as HTMLElement;
+        const inputEvent = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(inputEvent, 'target', { value: mockInput, configurable: true });
+
+        service.testHandleKeydown(inputEvent);
+        expect(perShortcutAction).not.toHaveBeenCalled();
+
+        // Test with div (allowed by both filters)
+        const mockDiv = { tagName: 'DIV' } as HTMLElement;
+        const divEvent = createKeyboardEvent({ key: 'p', ctrlKey: true });
+        Object.defineProperty(divEvent, 'target', { value: mockDiv, configurable: true });
+
+        service.testHandleKeydown(divEvent);
+        expect(perShortcutAction).toHaveBeenCalled();
+      });
+    });
+
+    describe('Group-Level Filters', () => {
+      let groupAction1: jasmine.Spy;
+      let groupAction2: jasmine.Spy;
+      let groupShortcuts: KeyboardShortcut[];
+
+      beforeEach(() => {
+        groupAction1 = jasmine.createSpy('groupAction1');
+        groupAction2 = jasmine.createSpy('groupAction2');
+        groupShortcuts = [
+          {
+            id: 'group-shortcut-1',
+            keys: ['ctrl', 'g'],
+            macKeys: ['meta', 'g'],
+            action: groupAction1,
+            description: 'Group shortcut 1',
+          },
+          {
+            id: 'group-shortcut-2',
+            keys: ['ctrl', 'h'],
+            macKeys: ['meta', 'h'],
+            action: groupAction2,
+            description: 'Group shortcut 2',
+          },
+        ];
+      });
+
+      it('should execute shortcuts when group filter returns true', () => {
+        const groupFilter = jasmine.createSpy('groupFilter').and.returnValue(true);
+
+        service.registerGroup('test-group', groupShortcuts, { filter: groupFilter });
+
+        const event = createKeyboardEvent({ key: 'g', ctrlKey: true });
+        service.testHandleKeydown(event);
+
+        expect(groupFilter).toHaveBeenCalledWith(event);
+        expect(groupAction1).toHaveBeenCalled();
+      });
+
+      it('should not execute shortcuts when group filter returns false', () => {
+        const groupFilter = jasmine.createSpy('groupFilter').and.returnValue(false);
+
+        service.registerGroup('test-group', groupShortcuts, { filter: groupFilter });
+
+        const event = createKeyboardEvent({ key: 'g', ctrlKey: true });
+        service.testHandleKeydown(event);
+
+        expect(groupFilter).toHaveBeenCalledWith(event);
+        expect(groupAction1).not.toHaveBeenCalled();
+      });
+
+      it('should apply group filter to all shortcuts in the group', () => {
+        const groupFilter = jasmine.createSpy('groupFilter').and.returnValue(false);
+
+        service.registerGroup('test-group', groupShortcuts, { filter: groupFilter });
+
+        // Test first shortcut
+        const event1 = createKeyboardEvent({ key: 'g', ctrlKey: true });
+        service.testHandleKeydown(event1);
+        expect(groupAction1).not.toHaveBeenCalled();
+
+        // Test second shortcut
+        const event2 = createKeyboardEvent({ key: 'h', ctrlKey: true });
+        service.testHandleKeydown(event2);
+        expect(groupAction2).not.toHaveBeenCalled();
+
+        expect(groupFilter).toHaveBeenCalledTimes(2);
+      });
+
+      it('should work with all three filter levels: global, group, and per-shortcut', () => {
+        // Add global filter that blocks divs
+        service.addFilter('divs', (event) => {
+          const target = event.target as HTMLElement;
+          return target?.tagName?.toLowerCase() !== 'div';
+        });
+
+        // Add group filter that blocks buttons
+        const groupFilter = (event: KeyboardEvent) => {
+          const target = event.target as HTMLElement;
+          return target?.tagName?.toLowerCase() !== 'button';
+        };
+
+        // Add per-shortcut filter that blocks inputs
+        const shortcutWithFilter: KeyboardShortcut = {
+          id: 'filtered-shortcut',
+          keys: ['ctrl', 'f'],
+          macKeys: ['meta', 'f'],
+          action: jasmine.createSpy('filteredAction'),
+          filter: (event) => {
+            const target = event.target as HTMLElement;
+            return target?.tagName?.toLowerCase() !== 'input';
+          },
+          description: 'Filtered shortcut',
+        };
+
+        service.registerGroup('filtered-group', [shortcutWithFilter], { filter: groupFilter });
+
+        // Test with div (blocked by global filter)
+        const mockDiv = { tagName: 'DIV' } as HTMLElement;
+        const divEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
+        Object.defineProperty(divEvent, 'target', { value: mockDiv, configurable: true });
+        service.testHandleKeydown(divEvent);
+        expect(shortcutWithFilter.action).not.toHaveBeenCalled();
+
+        // Test with button (blocked by group filter)
+        const mockButton = { tagName: 'BUTTON' } as HTMLElement;
+        const buttonEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
+        Object.defineProperty(buttonEvent, 'target', { value: mockButton, configurable: true });
+        service.testHandleKeydown(buttonEvent);
+        expect(shortcutWithFilter.action).not.toHaveBeenCalled();
+
+        // Test with input (blocked by per-shortcut filter)
+        const mockInput = { tagName: 'INPUT' } as HTMLElement;
+        const inputEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
+        Object.defineProperty(inputEvent, 'target', { value: mockInput, configurable: true });
+        service.testHandleKeydown(inputEvent);
+        expect(shortcutWithFilter.action).not.toHaveBeenCalled();
+
+        // Test with span (allowed by all filters)
+        const mockSpan = { tagName: 'SPAN' } as HTMLElement;
+        const spanEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
+        Object.defineProperty(spanEvent, 'target', { value: mockSpan, configurable: true });
+        service.testHandleKeydown(spanEvent);
+        expect(shortcutWithFilter.action).toHaveBeenCalled();
+      });
+
+      it('should support backward compatibility with old activeUntil parameter', () => {
+        const destroyRef = jasmine.createSpyObj('DestroyRef', ['onDestroy']);
+
+        // This should still work with the old API
+        service.registerGroup('legacy-group', groupShortcuts, destroyRef);
+
+        const event = createKeyboardEvent({ key: 'g', ctrlKey: true });
+        service.testHandleKeydown(event);
+
+        expect(groupAction1).toHaveBeenCalled();
+        expect(destroyRef.onDestroy).toHaveBeenCalled();
       });
     });
   });

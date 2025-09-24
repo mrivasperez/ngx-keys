@@ -10,7 +10,8 @@ A lightweight, reactive Angular service for managing keyboard shortcuts with sig
 - **🌍 Cross-Platform**: Automatic Mac/PC key display formatting
 - **🔄 Dynamic Management**: Add, remove, activate/deactivate shortcuts at runtime
 - **📁 Group Management**: Organize shortcuts into logical groups
-- **🪶 Lightweight**: Zero dependencies, minimal bundle impact
+- **� Smart Conflict Detection**: Register multiple shortcuts with same keys when not simultaneously active
+- **�🪶 Lightweight**: Zero dependencies, minimal bundle impact
 
 ## Installation
 
@@ -122,6 +123,56 @@ this.keyboardService.register({
 });
 ```
 
+### Smart Conflict Detection
+> [!IMPORTANT]
+Conflicts are only checked among **active** shortcuts, not all registered shortcuts.
+
+ngx-keys allows registering multiple shortcuts with the same key combination, as long as they're not simultaneously active. This enables powerful patterns:
+
+- **Context-specific shortcuts**: Same keys for different UI contexts
+- **Alternative shortcuts**: Multiple ways to trigger the same action 
+- **Feature toggles**: Same keys for different modes
+
+```typescript
+// Basic conflict handling
+this.keyboardService.register(shortcut1); // Active by default
+this.keyboardService.deactivate('shortcut1'); 
+this.keyboardService.register(shortcut2); // Same keys, but shortcut1 is inactive ✅
+
+// This would fail - conflicts with active shortcut2
+// this.keyboardService.activate('shortcut1'); // ❌ Throws error
+```
+
+### Group Management
+
+Organize related shortcuts into groups for easier management:
+
+```typescript
+const editorShortcuts = [
+  {
+    id: 'bold',
+    keys: ['ctrl', 'b'],
+    macKeys: ['meta', 'b'],
+    action: () => this.makeBold(),
+    description: 'Make text bold'
+  },
+  {
+    id: 'italic', 
+    keys: ['ctrl', 'i'],
+    macKeys: ['meta', 'i'],
+    action: () => this.makeItalic(),
+    description: 'Make text italic'
+  }
+];
+
+// Register all shortcuts in the group
+this.keyboardService.registerGroup('editor', editorShortcuts);
+
+// Control the entire group
+this.keyboardService.deactivateGroup('editor'); // Disable all editor shortcuts
+this.keyboardService.activateGroup('editor');   // Re-enable all editor shortcuts
+```
+
 ### Multi-step (sequence) shortcuts
 
 In addition to single-step shortcuts using `keys` / `macKeys`, ngx-keys supports ordered multi-step sequences using `steps` and `macSteps` on the `KeyboardShortcut` object. Each element in `steps` is itself an array of key tokens that must be pressed together for that step.
@@ -138,7 +189,7 @@ this.keyboardService.register({
 });
 ```
 
-Important behavior notes:
+**Important behavior notes**
 
 - Default sequence timeout: the service requires the next step to be entered within 2000ms (2 seconds) of the previous step; otherwise the pending sequence is cleared. This timeout is intentionally conservative and can be changed in future releases or exposed per-shortcut if needed.
 - Steps are order-sensitive. `steps: [['ctrl','k'], ['s']]` is different from `steps: [['s'], ['ctrl','k']]`.
@@ -155,6 +206,155 @@ this.keyboardService.deactivate('save');
 this.keyboardService.activate('save');
 ```
 
+## Advanced Usage
+
+### Context-Specific Shortcuts
+
+Register different actions for the same keys in different UI contexts:
+
+```typescript
+// Modal context
+this.keyboardService.register({
+  id: 'modal-escape',
+  keys: ['escape'],
+  action: () => this.closeModal(),
+  description: 'Close modal'
+});
+
+// Initially deactivate since modal isn't shown
+this.keyboardService.deactivate('modal-escape');
+
+// Editor context  
+this.keyboardService.register({
+  id: 'editor-escape',
+  keys: ['escape'], // Same key, different context
+  action: () => this.exitEditMode(),
+  description: 'Exit edit mode'
+});
+
+// Switch contexts dynamically
+showModal() {
+  this.keyboardService.deactivate('editor-escape');
+  this.keyboardService.activate('modal-escape');
+}
+
+hideModal() {
+  this.keyboardService.deactivate('modal-escape');
+  this.keyboardService.activate('editor-escape');
+}
+```
+
+### Alternative Shortcuts
+
+Provide multiple ways to trigger the same functionality:
+
+```typescript
+// Primary shortcut
+this.keyboardService.register({
+  id: 'help-f1',
+  keys: ['f1'],
+  action: () => this.showHelp(),
+  description: 'Show help (F1)'
+});
+
+// Alternative shortcut - different keys, same action
+this.keyboardService.register({
+  id: 'help-ctrl-h',
+  keys: ['ctrl', 'h'],
+  action: () => this.showHelp(), // Same action
+  description: 'Show help (Ctrl+H)'
+});
+
+// Both are active simultaneously since they don't conflict
+```
+
+### Feature Toggles
+
+Switch between different modes that use the same keys:
+
+```typescript
+// Design mode
+this.keyboardService.register({
+  id: 'design-mode-space',
+  keys: ['space'],
+  action: () => this.toggleDesignElement(),
+  description: 'Toggle design element'
+});
+
+// Play mode (same key, different action)
+this.keyboardService.register({
+  id: 'play-mode-space',
+  keys: ['space'],
+  action: () => this.pausePlayback(),
+  description: 'Pause/resume playback'
+});
+
+// Initially deactivate play mode
+this.keyboardService.deactivate('play-mode-space');
+
+// Switch modes
+switchToPlayMode() {
+  this.keyboardService.deactivate('design-mode-space');
+  this.keyboardService.activate('play-mode-space');
+}
+
+switchToDesignMode() {
+  this.keyboardService.deactivate('play-mode-space');
+  this.keyboardService.activate('design-mode-space');
+}
+```
+
+### Advanced Group Patterns
+
+Use groups for complex activation/deactivation scenarios:
+
+```typescript
+// Create context-specific groups
+const modalShortcuts = [
+  { id: 'modal-close', keys: ['escape'], action: () => this.closeModal(), description: 'Close modal' },
+  { id: 'modal-confirm', keys: ['enter'], action: () => this.confirmModal(), description: 'Confirm' }
+];
+
+const editorShortcuts = [
+  { id: 'editor-save', keys: ['ctrl', 's'], action: () => this.save(), description: 'Save' },
+  { id: 'editor-undo', keys: ['ctrl', 'z'], action: () => this.undo(), description: 'Undo' }
+];
+
+// Register both groups
+this.keyboardService.registerGroup('modal', modalShortcuts);
+this.keyboardService.registerGroup('editor', editorShortcuts);
+
+// Initially only editor is active
+this.keyboardService.deactivateGroup('modal');
+
+// Switch contexts
+showModal() {
+  this.keyboardService.deactivateGroup('editor');
+  this.keyboardService.activateGroup('modal');
+}
+
+hideModal() {
+  this.keyboardService.deactivateGroup('modal');
+  this.keyboardService.activateGroup('editor');
+}
+```
+
+### Conflict Detection Rules
+
+- **Registration**: Only checks conflicts with currently **active** shortcuts
+- **Activation**: Throws error if activating would conflict with other active shortcuts
+- **Groups**: Same rules apply - groups can contain conflicting shortcuts as long as they're not simultaneously active
+
+```typescript
+// ✅ This works - shortcuts with same keys but only one active at a time
+this.keyboardService.register(shortcut1); // Active by default
+this.keyboardService.deactivate('shortcut1'); 
+this.keyboardService.register(shortcut2); // Same keys, but shortcut1 is inactive
+
+// ❌ This fails - trying to activate would create conflict
+this.keyboardService.activate('shortcut1'); // Throws error - conflicts with active shortcut2
+```
+
 ## API Reference
 
 ### KeyboardShortcuts Service
@@ -162,15 +362,18 @@ this.keyboardService.activate('save');
 #### Methods
 
 **Registration Methods:**
-- `register(shortcut: KeyboardShortcut)` - Register and automatically activate a single shortcut *Throws error on conflicts*
-- `registerGroup(groupId: string, shortcuts: KeyboardShortcut[])` - Register and automatically activate a group of shortcuts *Throws error on conflicts*
+> [!TIP]
+Conflicts are only checked among **active** shortcuts, not all registered shortcuts.
+
+- `register(shortcut: KeyboardShortcut)` - Register and automatically activate a single shortcut *Throws error on conflicts with active shortcuts only*
+- `registerGroup(groupId: string, shortcuts: KeyboardShortcut[])` - Register and automatically activate a group of shortcuts *Throws error on conflicts with active shortcuts only*
 
 **Management Methods:**
 - `unregister(shortcutId: string)` - Remove a shortcut *Throws error if not found*
 - `unregisterGroup(groupId: string)` - Remove a group *Throws error if not found*
-- `activate(shortcutId: string)` - Activate a shortcut *Throws error if not registered*
+- `activate(shortcutId: string)` - Activate a shortcut *Throws error if not registered or would create conflicts*
 - `deactivate(shortcutId: string)` - Deactivate a shortcut *Throws error if not registered*
-- `activateGroup(groupId: string)` - Activate all shortcuts in a group *Throws error if not found*
+- `activateGroup(groupId: string)` - Activate all shortcuts in a group *Throws error if not found or would create conflicts*
 - `deactivateGroup(groupId: string)` - Deactivate all shortcuts in a group *Throws error if not found*
 
 **Query Methods:**
@@ -526,6 +729,157 @@ this.keyboardService.register({
   description: 'Demo chord'
 });
 ```
+
+### Event Filtering
+
+You can configure which keyboard events should be processed by setting a filter function. This is useful for ignoring shortcuts when users are typing in input fields, text areas, or other form elements.
+
+> [!NOTE]
+> **No Default Filtering**: ngx-keys processes ALL keyboard events by default. This gives you maximum flexibility - some apps want shortcuts to work everywhere, others want to exclude form inputs. You decide!
+
+#### Named filters (recommended)
+
+For efficiency and control, prefer named global filters. You can toggle them on/off without replacing others, and ngx-keys evaluates them only once per keydown event (fast path), short‑circuiting further work when blocked.
+
+```typescript
+// Add named filters
+keyboardService.addFilter('forms', (event) => {
+  const t = event.target as HTMLElement | null;
+  const tag = t?.tagName?.toLowerCase();
+  return !(['input', 'textarea', 'select'].includes(tag ?? '')) && !t?.isContentEditable;
+});
+
+keyboardService.addFilter('modal-scope', (event) => {
+  const t = event.target as HTMLElement | null;
+  return !!t?.closest('.modal');
+});
+
+// Remove/toggle when context changes
+keyboardService.removeFilter('modal-scope');
+
+// Inspect and manage
+keyboardService.getFilterNames(); // ['forms']
+keyboardService.clearFilters();   // remove all
+```
+
+```typescript
+import { Component, inject } from '@angular/core';
+import { KeyboardShortcuts, KeyboardShortcutFilter } from 'ngx-keys';
+
+export class FilterExampleComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+
+  constructor() {
+    // Set up shortcuts
+    this.keyboardService.register({
+      id: 'save',
+      keys: ['ctrl', 's'],
+      macKeys: ['meta', 's'],
+      action: () => this.save(),
+      description: 'Save document'
+    });
+
+    // Configure filtering to ignore form elements
+    this.setupInputFiltering();
+  }
+
+  private setupInputFiltering() {
+    const inputFilter: KeyboardShortcutFilter = (event) => {
+      const target = event.target as HTMLElement;
+      const tagName = target?.tagName?.toLowerCase();
+      return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
+    };
+
+    // Use named filter for toggling
+    this.keyboardService.addFilter('forms', inputFilter);
+  }
+
+  private save() {
+    console.log('Document saved!');
+  }
+}
+```
+
+#### Common Filter Patterns
+
+**Ignore form elements:**
+```typescript
+const formFilter: KeyboardShortcutFilter = (event) => {
+  const target = event.target as HTMLElement;
+  const tagName = target?.tagName?.toLowerCase();
+  return !['input', 'textarea', 'select'].includes(tagName) && !target?.isContentEditable;
+};
+
+keyboardService.addFilter('forms', formFilter);
+```
+
+**Ignore elements with specific attributes:**
+```typescript
+const attributeFilter: KeyboardShortcutFilter = (event) => {
+  const target = event.target as HTMLElement;
+  return !target?.hasAttribute('data-no-shortcuts');
+};
+
+keyboardService.addFilter('no-shortcuts-attr', attributeFilter);
+```
+
+**Complex conditional filtering:**
+```typescript
+const conditionalFilter: KeyboardShortcutFilter = (event) => {
+  const target = event.target as HTMLElement;
+  
+  // Allow shortcuts in code editors (even though they're contentEditable)
+  if (target?.classList?.contains('code-editor')) {
+    return true;
+  }
+  
+  // Block shortcuts in form elements
+  if (target?.tagName?.match(/INPUT|TEXTAREA|SELECT/i) || target?.isContentEditable) {
+    return false;
+  }
+  
+  return true;
+};
+
+keyboardService.addFilter('conditional', conditionalFilter);
+```
+
+**Remove filtering:**
+```typescript
+// Remove a specific named filter
+keyboardService.removeFilter('forms');
+// Or remove all
+keyboardService.clearFilters();
+```
+
+#### Example: Modal Context Filtering
+
+```typescript
+export class ModalComponent {
+  constructor() {
+    // When modal opens, only allow modal-specific shortcuts
+    this.keyboardService.addFilter('modal-scope', (event) => {
+      const target = event.target as HTMLElement;
+      
+      // Only process events within the modal
+      return target?.closest('.modal') !== null;
+    });
+  }
+
+  onClose() {
+    // Restore normal filtering when modal closes
+    this.keyboardService.removeFilter('modal-scope');
+  }
+}
+```
+
+#### Performance tips
+
+- Filters are evaluated once per keydown before scanning shortcuts. If any global filter returns false, ngx-keys exits early and clears pending sequences.
+- Group-level filters are precomputed once per event; shortcuts in blocked groups are skipped without key matching.
+- Keep filters cheap and synchronous. Prefer reading event.target properties (tagName, isContentEditable, classList) over layout-triggering queries.
+- Use named filters to toggle contexts (modals, editors) without allocating new closures per interaction.
+- Avoid complex DOM traversals inside filters; if needed, memoize simple queries or use attributes (e.g., data-no-shortcuts).
 
 ## Building
 
