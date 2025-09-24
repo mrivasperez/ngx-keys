@@ -7,7 +7,7 @@ import {
   createMockShortcuts,
   createKeyboardEvent,
   KeyboardEvents,
-  TestKeyboardShortcutsWithFakeDestruct,
+  createFakeDestroyRef,
   TestObservables,
   createMultiStepMockShortcut,
   dispatchKeyEvent,
@@ -29,26 +29,18 @@ describe('KeyboardShortcuts', () => {
     description: 'Test shortcut',
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     TestBed.configureTestingModule({
-      providers: [
-        ngCore.provideZonelessChangeDetection(),
-        KeyboardShortcuts,
-        TestKeyboardShortcutsWithFakeDestruct,
-      ],
+      providers: [ngCore.provideZonelessChangeDetection(), KeyboardShortcuts],
     });
     service = TestBed.inject(KeyboardShortcuts);
-    // Ensure the service starts listening to document/window events synchronously
-    // in the test environment (the real service schedules startListening via
-    // afterNextRender). Calling the private startListening here ensures our
-    // dispatched DOM events are picked up during tests.
-    if ((service as any).startListening) {
-      try {
-        (service as any).startListening();
-      } catch {
-        /* ignore */
-      }
-    }
+
+    // Allow a microtask tick for the service to perform any async setup
+    // (the real service schedules listening via afterNextRender). Tests
+    // should not call private methods; instead we give the runtime a chance
+    // to attach DOM listeners.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
     mockAction = jasmine.createSpy('mockAction');
   });
 
@@ -182,7 +174,7 @@ describe('KeyboardShortcuts', () => {
 
       it('should unregister when activeUntil is "destruct" by using an overridden setupActiveUntil', () => {
         const mockAction = jasmine.createSpy('mockAction');
-        const localService = TestBed.inject(TestKeyboardShortcutsWithFakeDestruct);
+        const fake = createFakeDestroyRef();
 
         const shortcut = createMockShortcut({
           id: 'destruct-test',
@@ -190,15 +182,15 @@ describe('KeyboardShortcuts', () => {
           macKeys: ['f4'],
           action: mockAction,
           description: 'Test destruct',
-          activeUntil: 'destruct',
+          activeUntil: fake as any,
         });
 
-        localService.register(shortcut);
-        expect(localService.isRegistered('destruct-test')).toBe(true);
+        service.register(shortcut);
+        expect(service.isRegistered('destruct-test')).toBe(true);
 
-        // Trigger destruction using the utility's fake DestroyRef
-        localService.fakeDestroyRef.trigger();
-        expect(localService.isRegistered('destruct-test')).toBe(false);
+        // Trigger destruction using the fake DestroyRef
+        fake.trigger();
+        expect(service.isRegistered('destruct-test')).toBe(false);
       });
 
       it('should unregister when activeUntil is a DestroyRef instance', () => {
@@ -358,7 +350,7 @@ describe('KeyboardShortcuts', () => {
 
       it('should unregister group when activeUntil is "destruct" by using an overridden setupActiveUntil', () => {
         const mockAction = jasmine.createSpy('mockAction');
-        const localService = TestBed.inject(TestKeyboardShortcutsWithFakeDestruct);
+        const fake = createFakeDestroyRef();
 
         const shortcuts = [
           {
@@ -370,11 +362,11 @@ describe('KeyboardShortcuts', () => {
           },
         ];
 
-        localService.registerGroup('group-destruct', shortcuts, 'destruct' as any);
-        expect(localService.isGroupRegistered('group-destruct')).toBe(true);
+        service.registerGroup('group-destruct', shortcuts, fake as any);
+        expect(service.isGroupRegistered('group-destruct')).toBe(true);
 
-        localService.fakeDestroyRef.trigger();
-        expect(localService.isGroupRegistered('group-destruct')).toBe(false);
+        fake.trigger();
+        expect(service.isGroupRegistered('group-destruct')).toBe(false);
       });
 
       it('should unregister group when activeUntil is a DestroyRef instance', () => {
@@ -1398,9 +1390,7 @@ describe('KeyboardShortcuts', () => {
     describe('Global Filter Processing', () => {
       it('should execute shortcut when no filters are set', () => {
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
-
-        service.testHandleKeydown(event);
-
+        dispatchKeyEvent(event);
         expect(mockAction).toHaveBeenCalled();
       });
 
@@ -1408,9 +1398,7 @@ describe('KeyboardShortcuts', () => {
         service.addFilter('filter1', () => true);
         service.addFilter('filter2', () => true);
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
-
-        service.testHandleKeydown(event);
-
+        dispatchKeyEvent(event);
         expect(mockAction).toHaveBeenCalled();
       });
 
@@ -1418,9 +1406,7 @@ describe('KeyboardShortcuts', () => {
         service.addFilter('allow', () => true);
         service.addFilter('block', () => false);
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
-
-        service.testHandleKeydown(event);
-
+        dispatchKeyEvent(event);
         expect(mockAction).not.toHaveBeenCalled();
       });
 
@@ -1430,9 +1416,7 @@ describe('KeyboardShortcuts', () => {
         service.addFilter('filter1', filter1Spy);
         service.addFilter('filter2', filter2Spy);
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
-
-        service.testHandleKeydown(event);
-
+        dispatchKeyEvent(event);
         expect(filter1Spy).toHaveBeenCalledWith(event);
         expect(filter2Spy).toHaveBeenCalledWith(event);
         expect(mockAction).toHaveBeenCalled();
@@ -1458,7 +1442,7 @@ describe('KeyboardShortcuts', () => {
         // Mock the target property
         Object.defineProperty(inputEvent, 'target', { value: mockInput, configurable: true });
 
-        service.testHandleKeydown(inputEvent);
+        dispatchKeyEvent(inputEvent);
         expect(mockAction).not.toHaveBeenCalled();
 
         // Reset spy for next test
@@ -1473,7 +1457,7 @@ describe('KeyboardShortcuts', () => {
         const divEvent = createKeyboardEvent({ key: 's', ctrlKey: true });
         Object.defineProperty(divEvent, 'target', { value: mockDiv, configurable: true });
 
-        service.testHandleKeydown(divEvent);
+        dispatchKeyEvent(divEvent);
         expect(mockAction).toHaveBeenCalled();
       });
 
@@ -1492,9 +1476,7 @@ describe('KeyboardShortcuts', () => {
 
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
         Object.defineProperty(event, 'target', { value: mockEditableDiv, configurable: true });
-
-        service.testHandleKeydown(event);
-
+        dispatchKeyEvent(event);
         expect(mockAction).not.toHaveBeenCalled();
       });
 
@@ -1502,26 +1484,25 @@ describe('KeyboardShortcuts', () => {
         // Start with permissive filter
         service.addFilter('test', () => true);
         const event = createKeyboardEvent({ key: 's', ctrlKey: true });
-
-        service.testHandleKeydown(event);
+        dispatchKeyEvent(event);
         expect(mockAction).toHaveBeenCalledTimes(1);
 
         // Add restrictive filter
         service.addFilter('block', () => false);
 
-        service.testHandleKeydown(event);
+        dispatchKeyEvent(event);
         expect(mockAction).toHaveBeenCalledTimes(1); // Should not increase
 
         // Remove restrictive filter
         service.removeFilter('block');
 
-        service.testHandleKeydown(event);
+        dispatchKeyEvent(event);
         expect(mockAction).toHaveBeenCalledTimes(2); // Should increase
 
         // Remove all filters
         service.clearFilters();
 
-        service.testHandleKeydown(event);
+        dispatchKeyEvent(event);
         expect(mockAction).toHaveBeenCalledTimes(3); // Should increase
       });
     });
@@ -1547,11 +1528,11 @@ describe('KeyboardShortcuts', () => {
 
         // Try to start sequence - should be blocked by filter
         const firstStepEvent = createKeyboardEvent({ key: 'k', ctrlKey: true });
-        service.testHandleKeydown(firstStepEvent);
+        dispatchKeyEvent(firstStepEvent);
 
         // Try second step
         const secondStepEvent = createKeyboardEvent({ key: 's' });
-        service.testHandleKeydown(secondStepEvent);
+        dispatchKeyEvent(secondStepEvent);
 
         expect(multiStepAction).not.toHaveBeenCalled();
       });
@@ -1561,11 +1542,11 @@ describe('KeyboardShortcuts', () => {
 
         // Start sequence
         const firstStepEvent = createKeyboardEvent({ key: 'k', ctrlKey: true });
-        service.testHandleKeydown(firstStepEvent);
+        dispatchKeyEvent(firstStepEvent);
 
         // Complete sequence
         const secondStepEvent = createKeyboardEvent({ key: 's' });
-        service.testHandleKeydown(secondStepEvent);
+        dispatchKeyEvent(secondStepEvent);
 
         expect(multiStepAction).toHaveBeenCalled();
       });
@@ -1596,8 +1577,7 @@ describe('KeyboardShortcuts', () => {
         const event = createKeyboardEvent({ key: 'p', ctrlKey: true });
         Object.defineProperty(event, 'target', { value: mockDiv, configurable: true });
 
-        service.testHandleKeydown(event);
-
+        dispatchKeyEvent(event);
         expect(perShortcutAction).toHaveBeenCalled();
       });
 
@@ -1606,8 +1586,7 @@ describe('KeyboardShortcuts', () => {
         const event = createKeyboardEvent({ key: 'p', ctrlKey: true });
         Object.defineProperty(event, 'target', { value: mockInput, configurable: true });
 
-        service.testHandleKeydown(event);
-
+        dispatchKeyEvent(event);
         expect(perShortcutAction).not.toHaveBeenCalled();
       });
 
@@ -1623,7 +1602,7 @@ describe('KeyboardShortcuts', () => {
         const buttonEvent = createKeyboardEvent({ key: 'p', ctrlKey: true });
         Object.defineProperty(buttonEvent, 'target', { value: mockButton, configurable: true });
 
-        service.testHandleKeydown(buttonEvent);
+        dispatchKeyEvent(buttonEvent);
         expect(perShortcutAction).not.toHaveBeenCalled();
 
         // Test with input (blocked by per-shortcut filter)
@@ -1631,7 +1610,7 @@ describe('KeyboardShortcuts', () => {
         const inputEvent = createKeyboardEvent({ key: 'p', ctrlKey: true });
         Object.defineProperty(inputEvent, 'target', { value: mockInput, configurable: true });
 
-        service.testHandleKeydown(inputEvent);
+        dispatchKeyEvent(inputEvent);
         expect(perShortcutAction).not.toHaveBeenCalled();
 
         // Test with div (allowed by both filters)
@@ -1639,7 +1618,7 @@ describe('KeyboardShortcuts', () => {
         const divEvent = createKeyboardEvent({ key: 'p', ctrlKey: true });
         Object.defineProperty(divEvent, 'target', { value: mockDiv, configurable: true });
 
-        service.testHandleKeydown(divEvent);
+        dispatchKeyEvent(divEvent);
         expect(perShortcutAction).toHaveBeenCalled();
       });
     });
@@ -1676,7 +1655,7 @@ describe('KeyboardShortcuts', () => {
         service.registerGroup('test-group', groupShortcuts, { filter: groupFilter });
 
         const event = createKeyboardEvent({ key: 'g', ctrlKey: true });
-        service.testHandleKeydown(event);
+        dispatchKeyEvent(event);
 
         expect(groupFilter).toHaveBeenCalledWith(event);
         expect(groupAction1).toHaveBeenCalled();
@@ -1688,7 +1667,7 @@ describe('KeyboardShortcuts', () => {
         service.registerGroup('test-group', groupShortcuts, { filter: groupFilter });
 
         const event = createKeyboardEvent({ key: 'g', ctrlKey: true });
-        service.testHandleKeydown(event);
+        dispatchKeyEvent(event);
 
         expect(groupFilter).toHaveBeenCalledWith(event);
         expect(groupAction1).not.toHaveBeenCalled();
@@ -1701,12 +1680,12 @@ describe('KeyboardShortcuts', () => {
 
         // Test first shortcut
         const event1 = createKeyboardEvent({ key: 'g', ctrlKey: true });
-        service.testHandleKeydown(event1);
+        dispatchKeyEvent(event1);
         expect(groupAction1).not.toHaveBeenCalled();
 
         // Test second shortcut
         const event2 = createKeyboardEvent({ key: 'h', ctrlKey: true });
-        service.testHandleKeydown(event2);
+        dispatchKeyEvent(event2);
         expect(groupAction2).not.toHaveBeenCalled();
 
         expect(groupFilter).toHaveBeenCalledTimes(2);
@@ -1744,28 +1723,28 @@ describe('KeyboardShortcuts', () => {
         const mockDiv = { tagName: 'DIV' } as HTMLElement;
         const divEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
         Object.defineProperty(divEvent, 'target', { value: mockDiv, configurable: true });
-        service.testHandleKeydown(divEvent);
+        dispatchKeyEvent(divEvent);
         expect(shortcutWithFilter.action).not.toHaveBeenCalled();
 
         // Test with button (blocked by group filter)
         const mockButton = { tagName: 'BUTTON' } as HTMLElement;
         const buttonEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
         Object.defineProperty(buttonEvent, 'target', { value: mockButton, configurable: true });
-        service.testHandleKeydown(buttonEvent);
+        dispatchKeyEvent(buttonEvent);
         expect(shortcutWithFilter.action).not.toHaveBeenCalled();
 
         // Test with input (blocked by per-shortcut filter)
         const mockInput = { tagName: 'INPUT' } as HTMLElement;
         const inputEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
         Object.defineProperty(inputEvent, 'target', { value: mockInput, configurable: true });
-        service.testHandleKeydown(inputEvent);
+        dispatchKeyEvent(inputEvent);
         expect(shortcutWithFilter.action).not.toHaveBeenCalled();
 
         // Test with span (allowed by all filters)
         const mockSpan = { tagName: 'SPAN' } as HTMLElement;
         const spanEvent = createKeyboardEvent({ key: 'f', ctrlKey: true });
         Object.defineProperty(spanEvent, 'target', { value: mockSpan, configurable: true });
-        service.testHandleKeydown(spanEvent);
+        dispatchKeyEvent(spanEvent);
         expect(shortcutWithFilter.action).toHaveBeenCalled();
       });
 
@@ -1776,7 +1755,7 @@ describe('KeyboardShortcuts', () => {
         service.registerGroup('legacy-group', groupShortcuts, destroyRef);
 
         const event = createKeyboardEvent({ key: 'g', ctrlKey: true });
-        service.testHandleKeydown(event);
+        dispatchKeyEvent(event);
 
         expect(groupAction1).toHaveBeenCalled();
         expect(destroyRef.onDestroy).toHaveBeenCalled();
