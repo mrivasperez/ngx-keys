@@ -7,6 +7,9 @@ export const KeyboardShortcutsErrors = {
   SHORTCUT_ALREADY_REGISTERED: (id: string) => `Shortcut "${id}" already registered`,
   GROUP_ALREADY_REGISTERED: (id: string) => `Group "${id}" already registered`,
   KEY_CONFLICT: (conflictId: string) => `Key conflict with "${conflictId}"`,
+  ACTIVE_KEY_CONFLICT: (conflictId: string) => `Key conflict with active shortcut "${conflictId}"`,
+  ACTIVATION_KEY_CONFLICT: (shortcutId: string, conflictIds: string[]) => `Cannot activate "${shortcutId}": would conflict with active shortcuts: ${conflictIds.join(', ')}`,
+  GROUP_ACTIVATION_KEY_CONFLICT: (groupId: string, conflictIds: string[]) => `Cannot activate group "${groupId}": would conflict with active shortcuts: ${conflictIds.join(', ')}`,
   SHORTCUT_IDS_ALREADY_REGISTERED: (ids: string[]) => `Shortcut IDs already registered: ${ids.join(', ')}`,
   DUPLICATE_SHORTCUTS_IN_GROUP: (ids: string[]) => `Duplicate shortcuts in group: ${ids.join(', ')}`,
   KEY_CONFLICTS_IN_GROUP: (conflicts: string[]) => `Key conflicts: ${conflicts.join(', ')}`,
@@ -70,6 +73,30 @@ export class KeyboardShortcutsErrorFactory {
       'KEY_CONFLICT',
       KeyboardShortcutsErrors.KEY_CONFLICT(conflictId),
       { conflictId }
+    );
+  }
+
+  static activeKeyConflict(conflictId: string): KeyboardShortcutError {
+    return new KeyboardShortcutError(
+      'ACTIVE_KEY_CONFLICT',
+      KeyboardShortcutsErrors.ACTIVE_KEY_CONFLICT(conflictId),
+      { conflictId }
+    );
+  }
+
+  static activationKeyConflict(shortcutId: string, conflictIds: string[]): KeyboardShortcutError {
+    return new KeyboardShortcutError(
+      'ACTIVATION_KEY_CONFLICT',
+      KeyboardShortcutsErrors.ACTIVATION_KEY_CONFLICT(shortcutId, conflictIds),
+      { shortcutId, conflictIds }
+    );
+  }
+
+  static groupActivationKeyConflict(groupId: string, conflictIds: string[]): KeyboardShortcutError {
+    return new KeyboardShortcutError(
+      'GROUP_ACTIVATION_KEY_CONFLICT',
+      KeyboardShortcutsErrors.GROUP_ACTIVATION_KEY_CONFLICT(groupId, conflictIds),
+      { groupId, conflictIds }
     );
   }
 

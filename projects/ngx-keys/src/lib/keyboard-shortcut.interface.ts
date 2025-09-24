@@ -10,6 +10,14 @@ export interface KeyboardShortcut {
   /**
    * Single-step shortcuts keep the existing shape using `keys`/`macKeys`.
    * For multi-step shortcuts, use `steps` (array of steps), where each step is an array of keys.
+   * 
+   * The library allows registering multiple shortcuts with the same 
+   * key combination as long as they are not simultaneously active. This enables:
+   * - Context-specific shortcuts (e.g., same key in different UI contexts)
+   * - Alternative shortcuts for the same action 
+   * - Feature toggles with same keys for different modes
+   * 
+   * Conflicts are only checked among active shortcuts, not all registered shortcuts.
    */
   keys?: string[];
   macKeys?: string[];
