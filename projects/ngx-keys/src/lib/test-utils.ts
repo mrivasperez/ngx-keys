@@ -32,32 +32,44 @@ export interface MockShortcutConfig {
   steps?: string[][];
   macSteps?: string[][];
   description?: string;
-  action?: (() => void);
+  action?: () => void;
   activeUntil?: unknown;
 }
 
 /**
- * Creates a testable KeyboardShortcuts service instance with exposed protected methods
+ * NOTE: Tests should interact with the service via the service's public surface only.
+// To support zoneless tests we provide DOM event dispatch helpers below so
+// tests can simulate keyboard events instead of reaching into protected
+// methods. Avoid exporting internal/protected APIs from production code.
+
+/**
+ * Dispatches a keyboard event on the document for zoneless tests.
+ * The event bubbles and is cancelable by default to match the real events.
  */
-@Injectable()
-export class TestableKeyboardShortcuts extends KeyboardShortcuts {
-  constructor() {
-    super();
-    // Override platform detection for testing
-    (this as any).isListening = false;
+export function dispatchKeyEvent(event: KeyboardEvent): void {
+  document.dispatchEvent(event);
+}
+
+/**
+ * Simulate window blur for tests (clears pressed keys and pending sequences).
+ */
+export function dispatchWindowBlur(): void {
+  // Dispatch a blur on window
+  try {
+    (window as any).dispatchEvent(new Event('blur'));
+  } catch {
+    // Some test runtimes may not allow dispatching on window; try fallback
+    const evt = new Event('blur');
+    (globalThis as any).window?.dispatchEvent?.(evt);
   }
+}
 
-  // Expose protected blur/visibility handlers for tests
-  public testHandleWindowBlur = this.handleWindowBlur.bind(this);
-
-  // Make protected methods public for testing
-  public testHandleKeydown = this.handleKeydown.bind(this);
-  // Expose the canonical Set-based API for pressed keys to tests
-  public testGetPressedKeys = (event: KeyboardEvent): Set<string> => this.getPressedKeys(event);
-  // KeysMatch accepts either a Set or an array; keep the helper flexible for tests
-  public testKeysMatch = (pressed: Set<string> | string[], target: string[]) => this.keysMatch(pressed as any, target);
-  public testStepsMatch = (a: string[][], b: string[][]) => this.stepsMatch(a, b);
-  public testIsMacPlatform = () => this.isMacPlatform();
+/**
+ * Simulate document visibility change to hidden
+ */
+export function dispatchVisibilityHidden(): void {
+  Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
 }
 
 /**
@@ -65,12 +77,12 @@ export class TestableKeyboardShortcuts extends KeyboardShortcuts {
  */
 export function createMockShortcut(config: MockShortcutConfig = {}): KeyboardShortcut {
   const defaultAction = config.action || (() => {}); // Default to no-op function
-  
+
   const shortcut: KeyboardShortcut = {
     id: config.id || 'test-shortcut',
     action: defaultAction,
     description: config.description || 'Test shortcut',
-    ...(config.activeUntil !== undefined && { activeUntil: config.activeUntil as any })
+    ...(config.activeUntil !== undefined && { activeUntil: config.activeUntil as any }),
   };
 
   // Support both single-step and multi-step shortcuts
@@ -90,7 +102,10 @@ export function createMockShortcut(config: MockShortcutConfig = {}): KeyboardSho
 /**
  * Creates multiple mock shortcuts for group testing
  */
-export function createMockShortcuts(count: number, baseConfig: MockShortcutConfig = {}): KeyboardShortcut[] {
+export function createMockShortcuts(
+  count: number,
+  baseConfig: MockShortcutConfig = {}
+): KeyboardShortcut[] {
   return Array.from({ length: count }, (_, index) => {
     const config = { ...baseConfig };
     if (!config.id) config.id = `shortcut-${index + 1}`;
@@ -113,7 +128,7 @@ export function createKeyboardEvent(config: KeyboardEventConfig): KeyboardEvent 
     metaKey: config.metaKey || false,
     code: config.code,
     bubbles: config.bubbles !== false,
-    cancelable: config.cancelable !== false
+    cancelable: config.cancelable !== false,
   });
 }
 
@@ -128,13 +143,18 @@ export const KeyboardEvents = {
   enter: () => createKeyboardEvent({ key: 'Enter' }),
   escape: () => createKeyboardEvent({ key: 'Escape' }),
   f1: () => createKeyboardEvent({ key: 'F1' }),
-  allModifiers: (key: string) => createKeyboardEvent({ 
-    key, ctrlKey: true, altKey: true, shiftKey: true, metaKey: true 
-  }),
+  allModifiers: (key: string) =>
+    createKeyboardEvent({
+      key,
+      ctrlKey: true,
+      altKey: true,
+      shiftKey: true,
+      metaKey: true,
+    }),
   // Multi-step convenience events
   ctrlK: () => createKeyboardEvent({ key: 'k', ctrlKey: true }),
   metaK: () => createKeyboardEvent({ key: 'k', metaKey: true }),
-  plain: (key: string) => createKeyboardEvent({ key })
+  plain: (key: string) => createKeyboardEvent({ key }),
 };
 
 /**
@@ -152,7 +172,7 @@ export function createMultiStepMockShortcut(config: {
     steps: config.steps,
     macSteps: config.macSteps || config.steps, // Default to same as steps
     action: config.action,
-    description: config.description || 'Multi-step test shortcut'
+    description: config.description || 'Multi-step test shortcut',
   });
 }
 
@@ -160,14 +180,16 @@ export function createMultiStepMockShortcut(config: {
  * Helper to simulate a complete multi-step sequence
  */
 export function simulateMultiStepSequence(
-  service: TestableKeyboardShortcuts, 
-  steps: string[][], 
+  service: KeyboardShortcuts,
+  steps: string[][],
   delay: number = 100
 ): void {
   steps.forEach((step, index) => {
     setTimeout(() => {
       const event = createStepEvent(step);
-      service.testHandleKeydown(event);
+      // Dispatch the event on the document so the service's event listeners
+      // (registered in startListening) will receive it in a zoneless-friendly way.
+      dispatchKeyEvent(event);
     }, index * delay);
   });
 }
@@ -180,23 +202,24 @@ export function createStepEvent(step: string[]): KeyboardEvent {
     ctrlKey: false,
     altKey: false,
     shiftKey: false,
-    metaKey: false
+    metaKey: false,
   };
-  
+
   let mainKey = '';
-  
-  step.forEach(key => {
+
+  step.forEach((key) => {
     const lowerKey = key.toLowerCase();
     if (lowerKey === 'ctrl') modifiers.ctrlKey = true;
     else if (lowerKey === 'alt') modifiers.altKey = true;
     else if (lowerKey === 'shift') modifiers.shiftKey = true;
-    else if (lowerKey === 'meta' || lowerKey === 'cmd' || lowerKey === 'command') modifiers.metaKey = true;
+    else if (lowerKey === 'meta' || lowerKey === 'cmd' || lowerKey === 'command')
+      modifiers.metaKey = true;
     else mainKey = key;
   });
-  
+
   return createKeyboardEvent({
     key: mainKey,
-    ...modifiers
+    ...modifiers,
   });
 }
 
@@ -214,7 +237,7 @@ export class FakeDestroyRef {
    * Triggers all registered destroy callbacks
    */
   trigger(): void {
-    this.callbacks.forEach(cb => cb());
+    this.callbacks.forEach((cb) => cb());
     this.callbacks = [];
   }
 
@@ -234,27 +257,6 @@ export function createFakeDestroyRef(): FakeDestroyRef {
 }
 
 /**
- * Test service that extends KeyboardShortcuts to override activeUntil handling
- */
-@Injectable()
-export class TestKeyboardShortcutsWithFakeDestruct extends KeyboardShortcuts {
-  public fakeDestroyRef = createFakeDestroyRef();
-
-  constructor() {
-    super();
-    (this as any).isListening = false;
-  }
-
-  protected override setupActiveUntil(activeUntil: any, unregister: () => void): void {
-    if (activeUntil === 'destruct') {
-      this.fakeDestroyRef.onDestroy(unregister);
-      return;
-    }
-    return super.setupActiveUntil(activeUntil, unregister);
-  }
-}
-
-/**
  * Observable helpers for testing activeUntil with observables
  */
 export const TestObservables = {
@@ -262,9 +264,9 @@ export const TestObservables = {
    * Creates an observable that emits immediately (synchronous)
    */
   immediate: <T>(value: T): Observable<T> => of(value),
-  
+
   /**
    * Creates an observable that emits true immediately
    */
-  immediateTrigger: (): Observable<boolean> => of(true)
+  immediateTrigger: (): Observable<boolean> => of(true),
 };
