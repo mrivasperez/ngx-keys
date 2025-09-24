@@ -915,18 +915,87 @@ describe('KeyboardShortcuts', () => {
         );
       });
 
-      it('should throw error when registering shortcut with conflicting key combination', () => {
+      it('should throw error when registering shortcut with conflicting key combination with active shortcut', () => {
         service.register({ ...mockShortcut, id: 'shortcut-1' });
 
         const conflictingShortcut = {
           ...mockShortcut,
           id: 'shortcut-2',
-          keys: ['ctrl', 's'] // Conflict
+          keys: ['ctrl', 's'] // Conflict with active shortcut
         };
 
         expect(() => service.register(conflictingShortcut)).toThrowError(
-          KeyboardShortcutsErrors.KEY_CONFLICT('shortcut-1')
+          KeyboardShortcutsErrors.ACTIVE_KEY_CONFLICT('shortcut-1')
         );
+      });
+
+      it('should allow registering shortcuts with same keys when original is inactive', () => {
+        service.register({ ...mockShortcut, id: 'shortcut-1' });
+        service.deactivate('shortcut-1'); // Make it inactive
+
+        const sameKeysShortcut = {
+          ...mockShortcut,
+          id: 'shortcut-2',
+          keys: ['ctrl', 's'], // Same keys but original is inactive
+          action: () => {}
+        };
+
+        // Should not throw
+        expect(() => service.register(sameKeysShortcut)).not.toThrow();
+        expect(service.shortcuts$().all.length).toBe(2);
+      });
+
+      it('should allow context-specific shortcuts with same keys', () => {
+        // Modal context shortcut (initially inactive)
+        const modalEscape = createMockShortcut({
+          id: 'modal-escape',
+          keys: ['escape'],
+          action: () => {},
+          description: 'Close modal'
+        });
+        
+        service.register(modalEscape);
+        service.deactivate('modal-escape'); // Modal not shown initially
+
+        // Editor context shortcut  
+        const editorEscape = createMockShortcut({
+          id: 'editor-escape', 
+          keys: ['escape'], // Same key but different context
+          action: () => {},
+          description: 'Exit edit mode'
+        });
+
+        // Should allow since modal-escape is inactive
+        expect(() => service.register(editorEscape)).not.toThrow();
+        
+        // Both should be registered
+        expect(service.shortcuts$().all.length).toBe(2);
+        expect(service.shortcuts$().active.length).toBe(1); // Only editor-escape is active
+      });
+
+      it('should allow alternative shortcuts for same action', () => {
+        const helpF1 = createMockShortcut({
+          id: 'help-f1',
+          keys: ['f1'], // Override default keys
+          macKeys: ['f1'],
+          action: () => {},
+          description: 'Show help (F1)'
+        });
+        
+        const helpCtrlH = createMockShortcut({
+          id: 'help-ctrl-h', 
+          keys: ['ctrl', 'h'], // Different keys
+          macKeys: ['meta', 'h'],
+          action: () => {}, // Same action, different trigger
+          description: 'Show help (Ctrl+H)'
+        });
+
+        service.register(helpF1);
+        service.register(helpCtrlH);
+
+        // Both should be registered and active (no key conflict)
+        expect(service.shortcuts$().all.length).toBe(2);
+        expect(service.shortcuts$().active.length).toBe(2);
       });
 
       it('should throw error when registering group with duplicate group ID', () => {
@@ -992,20 +1061,185 @@ describe('KeyboardShortcuts', () => {
         );
       });
 
-      it('should throw error when registering group with conflicting key combination', () => {
+      it('should throw error when registering group with conflicting key combination with active shortcut', () => {
         service.register({ ...mockShortcut, id: 'existing-shortcut', keys: ['ctrl', 'p'] });
 
         const groupShortcuts: KeyboardShortcut[] = [{
           id: 'new-shortcut',
-          keys: ['ctrl', 'p'], // Conflict
+          keys: ['ctrl', 'p'], // Conflict with active shortcut
           macKeys: ['meta', 'o'],
           action: () => { },
           description: 'New'
         }];
 
         expect(() => service.registerGroup('conflict-group', groupShortcuts)).toThrowError(
-          KeyboardShortcutsErrors.KEY_CONFLICTS_IN_GROUP(['"new-shortcut" conflicts with "existing-shortcut"'])
+          KeyboardShortcutsErrors.KEY_CONFLICTS_IN_GROUP(['"new-shortcut" conflicts with active shortcut "existing-shortcut"'])
         );
+      });
+    });
+
+    describe('Activation Conflicts', () => {
+      it('should throw error when activating shortcut that would conflict with active shortcuts', () => {
+        const shortcut1 = createMockShortcut({
+          id: 'shortcut-1',
+          keys: ['ctrl', 's'],
+          action: () => {}
+        });
+
+        const shortcut2 = createMockShortcut({
+          id: 'shortcut-2', 
+          keys: ['ctrl', 's'], // Same keys
+          action: () => {}
+        });
+
+        // Register both (shortcut-1 will be active, shortcut-2 inactive)
+        service.register(shortcut1);
+        service.deactivate('shortcut-1');
+        service.register(shortcut2); // This should work since shortcut-1 is inactive
+
+        // Now try to activate shortcut-1, which should fail due to conflict with active shortcut-2
+        expect(() => service.activate('shortcut-1')).toThrowError(
+          KeyboardShortcutsErrors.ACTIVATION_KEY_CONFLICT('shortcut-1', ['shortcut-2'])
+        );
+      });
+
+      it('should allow activating shortcut when conflicting shortcuts are inactive', () => {
+        const shortcut1 = createMockShortcut({
+          id: 'shortcut-1',
+          keys: ['ctrl', 's'],
+          action: () => {}
+        });
+
+        const shortcut2 = createMockShortcut({
+          id: 'shortcut-2',
+          keys: ['ctrl', 's'], // Same keys
+          action: () => {}
+        });
+
+        // Register shortcut-1 (will be active)
+        service.register(shortcut1);
+        service.deactivate('shortcut-1'); // Make it inactive
+        
+        // Register shortcut-2 (will be active)
+        service.register(shortcut2);
+        service.deactivate('shortcut-2'); // Make it inactive too
+
+        // Now should be able to activate either one since the other is inactive
+        expect(() => service.activate('shortcut-1')).not.toThrow();
+        expect(service.isActive('shortcut-1')).toBe(true);
+        expect(service.isActive('shortcut-2')).toBe(false);
+      });
+
+      it('should handle feature toggle scenarios with same shortcut keys', () => {
+        const designModeSpace = createMockShortcut({
+          id: 'design-mode-space',
+          keys: ['space'],
+          action: () => {},
+          description: 'Toggle design element'
+        });
+
+        const playModeSpace = createMockShortcut({
+          id: 'play-mode-space',
+          keys: ['space'], // Same key
+          action: () => {},
+          description: 'Pause/resume playback'
+        });
+
+        // Register design mode shortcut (active by default)
+        service.register(designModeSpace);
+        
+        // Deactivate design mode first to allow play mode registration
+        service.deactivate('design-mode-space');
+        
+        // Register play mode shortcut (will be active since design mode is inactive)
+        service.register(playModeSpace);
+
+        // Verify the switch worked
+        expect(service.isActive('design-mode-space')).toBe(false);
+        expect(service.isActive('play-mode-space')).toBe(true);
+        
+        // Test switching back
+        service.deactivate('play-mode-space');
+        expect(() => service.activate('design-mode-space')).not.toThrow();
+        expect(service.isActive('design-mode-space')).toBe(true);
+        expect(service.isActive('play-mode-space')).toBe(false);
+      });
+
+      it('should throw error when activating group that would create conflicts', () => {
+        // Register an active shortcut
+        service.register(createMockShortcut({
+          id: 'existing-shortcut',
+          keys: ['ctrl', 's'],
+          macKeys: ['meta', 's'],
+          action: () => {}
+        }));
+
+        // Create a group with conflicting shortcut but register when existing is inactive
+        service.deactivate('existing-shortcut'); // Make existing inactive first
+        
+        const groupShortcuts = [
+          createMockShortcut({
+            id: 'group-shortcut-1',
+            keys: ['ctrl', 'a'],
+            macKeys: ['meta', 'a'],
+            action: () => {}
+          }),
+          createMockShortcut({
+            id: 'group-shortcut-2', 
+            keys: ['ctrl', 's'], // Same as existing-shortcut but it's inactive
+            macKeys: ['meta', 's'],
+            action: () => {}
+          })
+        ];
+
+        // Register the group (should work since existing-shortcut is inactive)
+        service.registerGroup('test-group', groupShortcuts);
+        service.deactivateGroup('test-group');
+        
+        // Now reactivate the existing shortcut
+        service.activate('existing-shortcut');
+
+        // Trying to activate the group should fail due to conflict
+        expect(() => service.activateGroup('test-group')).toThrowError(
+          KeyboardShortcutsErrors.GROUP_ACTIVATION_KEY_CONFLICT('test-group', ['existing-shortcut'])
+        );
+      });
+
+      it('should allow activating group when no conflicts exist', () => {
+        // Register an active shortcut
+        service.register(createMockShortcut({
+          id: 'existing-shortcut',
+          keys: ['ctrl', 's'],
+          macKeys: ['meta', 's'],
+          action: () => {}
+        }));
+
+        // Create a group with non-conflicting shortcuts
+        const groupShortcuts = [
+          createMockShortcut({
+            id: 'group-shortcut-1',
+            keys: ['ctrl', 'a'], // Different from existing shortcut
+            macKeys: ['meta', 'a'],
+            action: () => {}
+          }),
+          createMockShortcut({
+            id: 'group-shortcut-2',
+            keys: ['ctrl', 'd'], // Different from existing shortcut  
+            macKeys: ['meta', 'd'],
+            action: () => {}
+          })
+        ];
+
+        // Register the group - should work since no conflicts
+        expect(() => service.registerGroup('test-group', groupShortcuts)).not.toThrow();
+        
+        // Deactivate the group to test activation
+        service.deactivateGroup('test-group');
+
+        // Should be able to activate the group
+        expect(() => service.activateGroup('test-group')).not.toThrow();
+        expect(service.isActive('group-shortcut-1')).toBe(true);
+        expect(service.isActive('group-shortcut-2')).toBe(true);
       });
     });
 

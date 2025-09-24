@@ -205,11 +205,16 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   /**
-   * Check if a key combination is already registered
-   * @returns The ID of the conflicting shortcut, or null if no conflict
+   * Check if a key combination is already registered by an active shortcut
+   * @returns The ID of the conflicting active shortcut, or null if no active conflict
    */
-  private findConflict(newShortcut: KeyboardShortcut): string | null {
+  private findActiveConflict(newShortcut: KeyboardShortcut): string | null {
     for (const existing of this.shortcuts.values()) {
+      // Only check conflicts with active shortcuts
+      if (!this.activeShortcuts.has(existing.id)) {
+        continue;
+      }
+
       // Compare single-step shapes if provided
       if (newShortcut.keys && existing.keys && this.keysMatch(newShortcut.keys, existing.keys)) {
         return existing.id;
@@ -230,17 +235,44 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   /**
+   * Check if activating a shortcut would create key conflicts with other active shortcuts
+   * @returns Array of conflicting shortcut IDs that would be created by activation
+   */
+  private findActivationConflicts(shortcutId: string): string[] {
+    const shortcut = this.shortcuts.get(shortcutId);
+    if (!shortcut) return [];
+
+    const conflicts: string[] = [];
+    for (const existing of this.shortcuts.values()) {
+      // Skip self and inactive shortcuts
+      if (existing.id === shortcutId || !this.activeShortcuts.has(existing.id)) {
+        continue;
+      }
+
+      // Check for key conflicts
+      if ((shortcut.keys && existing.keys && this.keysMatch(shortcut.keys, existing.keys)) ||
+          (shortcut.macKeys && existing.macKeys && this.keysMatch(shortcut.macKeys, existing.macKeys)) ||
+          (shortcut.steps && existing.steps && this.stepsMatch(shortcut.steps, existing.steps)) ||
+          (shortcut.macSteps && existing.macSteps && this.stepsMatch(shortcut.macSteps, existing.macSteps))) {
+        conflicts.push(existing.id);
+      }
+    }
+    return conflicts;
+  }
+
+  /**
    * Register a single keyboard shortcut
-   * @throws KeyboardShortcutError if shortcut ID is already registered or key combination is in use
+   * @throws KeyboardShortcutError if shortcut ID is already registered or if the shortcut would conflict with currently active shortcuts
    */
   register(shortcut: KeyboardShortcut): void {
     if (this.shortcuts.has(shortcut.id)) {
       throw KeyboardShortcutsErrorFactory.shortcutAlreadyRegistered(shortcut.id);
     }
 
-    const conflictId = this.findConflict(shortcut);
+    // Check for conflicts only with currently active shortcuts
+    const conflictId = this.findActiveConflict(shortcut);
     if (conflictId) {
-      throw KeyboardShortcutsErrorFactory.keyConflict(conflictId);
+      throw KeyboardShortcutsErrorFactory.activeKeyConflict(conflictId);
     }
 
     this.shortcuts.set(shortcut.id, shortcut);
@@ -280,17 +312,17 @@ export class KeyboardShortcuts implements OnDestroy {
     if (this.groups.has(groupId)) {
       throw KeyboardShortcutsErrorFactory.groupAlreadyRegistered(groupId);
     }
-
-    // Check for duplicate shortcut IDs and key combination conflicts
+    
+    // Check for duplicate shortcut IDs and key combination conflicts with active shortcuts
     const duplicateIds: string[] = [];
     const keyConflicts: string[] = [];
     shortcuts.forEach(shortcut => {
       if (this.shortcuts.has(shortcut.id)) {
         duplicateIds.push(shortcut.id);
       }
-      const conflictId = this.findConflict(shortcut);
+      const conflictId = this.findActiveConflict(shortcut);
       if (conflictId) {
-        keyConflicts.push(`"${shortcut.id}" conflicts with "${conflictId}"`);
+        keyConflicts.push(`"${shortcut.id}" conflicts with active shortcut "${conflictId}"`);
       }
     });
 
@@ -381,11 +413,17 @@ export class KeyboardShortcuts implements OnDestroy {
 
   /**
    * Activate a single keyboard shortcut
-   * @throws KeyboardShortcutError if shortcut ID doesn't exist
+   * @throws KeyboardShortcutError if shortcut ID doesn't exist or if activation would create key conflicts
    */
   activate(shortcutId: string): void {
     if (!this.shortcuts.has(shortcutId)) {
       throw KeyboardShortcutsErrorFactory.cannotActivateShortcut(shortcutId);
+    }
+
+    // Check for conflicts that would be created by activation
+    const conflicts = this.findActivationConflicts(shortcutId);
+    if (conflicts.length > 0) {
+      throw KeyboardShortcutsErrorFactory.activationKeyConflict(shortcutId, conflicts);
     }
 
     this.activeShortcuts.add(shortcutId);
@@ -407,12 +445,23 @@ export class KeyboardShortcuts implements OnDestroy {
 
   /**
    * Activate a group of keyboard shortcuts
-   * @throws KeyboardShortcutError if group ID doesn't exist
+   * @throws KeyboardShortcutError if group ID doesn't exist or if activation would create key conflicts
    */
   activateGroup(groupId: string): void {
     const group = this.groups.get(groupId);
     if (!group) {
       throw KeyboardShortcutsErrorFactory.cannotActivateGroup(groupId);
+    }
+
+    // Check for conflicts that would be created by activating all shortcuts in the group
+    const allConflicts: string[] = [];
+    group.shortcuts.forEach(shortcut => {
+      const conflicts = this.findActivationConflicts(shortcut.id);
+      allConflicts.push(...conflicts);
+    });
+
+    if (allConflicts.length > 0) {
+      throw KeyboardShortcutsErrorFactory.groupActivationKeyConflict(groupId, allConflicts);
     }
 
     this.batchUpdate(() => {
