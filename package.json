@@ -1,6 +1,6 @@
 {
   "name": "ngx-keys",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A reactive Angular library for managing keyboard shortcuts with signals-based UI integration",
   "license": "0BSD",
   "repository": {
@@ -16,7 +16,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test ngx-keys --browsers=ChromeHeadless",
+    "test:ci": "ng test ngx-keys --no-watch --no-progress --browsers=ChromeHeadless"
   },
   "prettier": {
     "printWidth": 100,
