@@ -1,4 +1,3 @@
-import { Injectable } from '@angular/core';
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { KeyboardShortcut } from './keyboard-shortcut.interface';
 import { Observable, of } from 'rxjs';
