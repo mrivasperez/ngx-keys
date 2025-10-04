@@ -411,63 +411,7 @@ export class KeyboardShortcuts implements OnDestroy {
     });
   }
 
-  /**
-   * Unregister a specific shortcut from a group
-   * @param groupId - The group ID
-   * @param shortcutId - The shortcut ID to remove
-   * @throws KeyboardShortcutError if group doesn't exist or shortcut not found in group
-   */
-  unregisterGroupShortcut(groupId: string, shortcutId: string): void {
-    const group = this.groups.get(groupId);
-    if (!group) {
-      throw KeyboardShortcutsErrorFactory.cannotUnregisterGroup(groupId);
-    }
 
-    const shortcut = this.shortcuts.get(shortcutId);
-    if (!shortcut || this.shortcutToGroup.get(shortcutId) !== groupId) {
-      throw KeyboardShortcutsErrorFactory.cannotUnregisterShortcut(shortcutId);
-    }
-
-    // Remove from shortcuts map
-    this.shortcuts.delete(shortcutId);
-    this.activeShortcuts.delete(shortcutId);
-    this.shortcutToGroup.delete(shortcutId);
-
-    // Update group's shortcuts array
-    const updatedShortcuts = group.shortcuts.filter(s => s.id !== shortcutId);
-    
-    this.groups.set(groupId, {
-      ...group,
-      shortcuts: updatedShortcuts
-    });
-
-    // Trigger state update
-    this.updateState();
-  }
-
-  /**
-   * Unregister multiple shortcuts from a group
-   * @param groupId - The group ID
-   * @param shortcutIds - Array of shortcut IDs to remove
-   */
-  unregisterGroupShortcuts(groupId: string, shortcutIds: string[]): void {
-    this.batchUpdate(() => {
-      shortcutIds.forEach(id => this.unregisterGroupShortcut(groupId, id));
-    });
-  }
-
-  /**
-   * Check if a specific shortcut exists in a group
-   * @param groupId - The group ID
-   * @param shortcutId - The shortcut ID to check
-   * @returns True if the shortcut exists in the group
-   */
-  hasGroupShortcut(groupId: string, shortcutId: string): boolean {
-    const group = this.groups.get(groupId);
-    if (!group) return false;
-    
-    return this.shortcutToGroup.get(shortcutId) === groupId;
-  }
 
   /**
    * Activate a single keyboard shortcut

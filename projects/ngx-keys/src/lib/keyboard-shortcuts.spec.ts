@@ -438,7 +438,7 @@ describe('KeyboardShortcuts', () => {
     });
 
     describe('Individual Shortcut Operations', () => {
-      it('should unregister a specific shortcut from a group', () => {
+      it('should unregister a specific shortcut and remove it from its group', () => {
         const action1 = jasmine.createSpy('action1');
         const action2 = jasmine.createSpy('action2');
         
@@ -448,34 +448,18 @@ describe('KeyboardShortcuts', () => {
         ];
         
         service.registerGroup('editor', shortcuts);
-        expect(service.hasGroupShortcut('editor', 'save')).toBe(true);
+        expect(service.isRegistered('save')).toBe(true);
+        expect(service.isRegistered('undo')).toBe(true);
         
-        service.unregisterGroupShortcut('editor', 'save');
+        // Unregister automatically removes from all groups
+        service.unregister('save');
         
-        expect(service.hasGroupShortcut('editor', 'save')).toBe(false);
-        expect(service.hasGroupShortcut('editor', 'undo')).toBe(true);
+        expect(service.isRegistered('save')).toBe(false);
+        expect(service.isRegistered('undo')).toBe(true);
         expect(service.isGroupRegistered('editor')).toBe(true);
       });
 
-      it('should throw error when unregistering from non-existent group', () => {
-        expect(() => {
-          service.unregisterGroupShortcut('fake-group', 'shortcut');
-        }).toThrowError(KeyboardShortcutsErrors.CANNOT_UNREGISTER_GROUP('fake-group'));
-      });
-
-      it('should throw error when unregistering non-existent shortcut from group', () => {
-        const shortcuts = [
-          createMockShortcut({ id: 'save', keys: ['ctrl', 's'], action: mockAction })
-        ];
-        
-        service.registerGroup('editor', shortcuts);
-        
-        expect(() => {
-          service.unregisterGroupShortcut('editor', 'non-existent');
-        }).toThrowError(KeyboardShortcutsErrors.CANNOT_UNREGISTER_SHORTCUT('non-existent'));
-      });
-
-      it('should unregister multiple shortcuts from a group', () => {
+      it('should unregister individual shortcuts from a group using unregister()', () => {
         const shortcuts = [
           createMockShortcut({ id: 'save', keys: ['ctrl', 's'], action: mockAction }),
           createMockShortcut({ id: 'undo', keys: ['ctrl', 'z'], action: mockAction }),
@@ -483,26 +467,31 @@ describe('KeyboardShortcuts', () => {
         ];
         
         service.registerGroup('editor', shortcuts);
-        service.unregisterGroupShortcuts('editor', ['save', 'undo']);
         
-        expect(service.hasGroupShortcut('editor', 'save')).toBe(false);
-        expect(service.hasGroupShortcut('editor', 'undo')).toBe(false);
-        expect(service.hasGroupShortcut('editor', 'redo')).toBe(true);
+        // Unregister shortcuts individually
+        service.unregister('save');
+        service.unregister('undo');
+        
+        expect(service.isRegistered('save')).toBe(false);
+        expect(service.isRegistered('undo')).toBe(false);
+        expect(service.isRegistered('redo')).toBe(true);
+        expect(service.isGroupRegistered('editor')).toBe(true);
       });
 
-      it('should check if group has a specific shortcut', () => {
+      it('should verify shortcuts belong to registered groups', () => {
         const shortcuts = [
           createMockShortcut({ id: 'save', keys: ['ctrl', 's'], action: mockAction })
         ];
         
         service.registerGroup('editor', shortcuts);
         
-        expect(service.hasGroupShortcut('editor', 'save')).toBe(true);
-        expect(service.hasGroupShortcut('editor', 'non-existent')).toBe(false);
-        expect(service.hasGroupShortcut('non-existent-group', 'save')).toBe(false);
+        expect(service.isRegistered('save')).toBe(true);
+        expect(service.isRegistered('non-existent')).toBe(false);
+        expect(service.isGroupRegistered('editor')).toBe(true);
+        expect(service.isGroupRegistered('non-existent-group')).toBe(false);
       });
 
-      it('should handle unregistering shortcut that belongs to different group', () => {
+      it('should handle unregistering shortcuts from different groups', () => {
         const shortcuts1 = [
           createMockShortcut({ id: 'save', keys: ['ctrl', 's'], macKeys: ['meta', 's'], action: mockAction })
         ];
@@ -513,9 +502,14 @@ describe('KeyboardShortcuts', () => {
         service.registerGroup('group1', shortcuts1);
         service.registerGroup('group2', shortcuts2);
         
-        expect(() => {
-          service.unregisterGroupShortcut('group1', 'open');
-        }).toThrowError(KeyboardShortcutsErrors.CANNOT_UNREGISTER_SHORTCUT('open'));
+        // Both shortcuts should be registered
+        expect(service.isRegistered('save')).toBe(true);
+        expect(service.isRegistered('open')).toBe(true);
+        
+        // Unregister from different groups
+        service.unregister('save');
+        expect(service.isRegistered('save')).toBe(false);
+        expect(service.isRegistered('open')).toBe(true);
       });
     });
   });

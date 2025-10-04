@@ -370,10 +370,11 @@ Conflicts are only checked among **active** shortcuts, not all registered shortc
 - `registerMany(shortcuts: KeyboardShortcut[])` - Register multiple shortcuts in a single batch update
 
 **Unregistration Methods:**
-- `unregister(shortcutId: string)` - Remove a shortcut *Throws error if not found*
-- `unregisterGroup(groupId: string)` - Remove a group *Throws error if not found*
-- `unregisterGroupShortcut(groupId: string, shortcutId: string)` - Remove a specific shortcut from a group
-- `unregisterGroupShortcuts(groupId: string, shortcutIds: string[])` - Remove multiple shortcuts from a group
+> [!NOTE]
+> `unregister()` automatically removes shortcuts from all groups they belong to.
+
+- `unregister(shortcutId: string)` - Remove a shortcut and its group associations *Throws error if not found*
+- `unregisterGroup(groupId: string)` - Remove a group and all its shortcuts *Throws error if not found*
 - `unregisterMany(ids: string[])` - Unregister multiple shortcuts in a single batch update
 - `unregisterGroups(ids: string[])` - Unregister multiple groups in a single batch update
 - `clearAll()` - Remove all shortcuts, groups, and filters (nuclear reset)
@@ -403,7 +404,6 @@ Conflicts are only checked among **active** shortcuts, not all registered shortc
 - `isRegistered(shortcutId: string): boolean` - Check if a shortcut is registered
 - `isGroupActive(groupId: string): boolean` - Check if a group is active
 - `isGroupRegistered(groupId: string): boolean` - Check if a group is registered
-- `hasGroupShortcut(groupId: string, shortcutId: string): boolean` - Check if shortcut exists in group
 - `getShortcuts(): ReadonlyMap<string, KeyboardShortcut>` - Get all registered shortcuts
 - `getGroups(): ReadonlyMap<string, KeyboardShortcutGroup>` - Get all registered groups
 - `getGroupShortcuts(groupId: string): KeyboardShortcut[]` - Get all shortcuts in a specific group
@@ -777,18 +777,21 @@ export class MyComponent {
   private readonly keyboardService = inject(KeyboardShortcuts);
 
   manageEditorGroup() {
-    // Check if a shortcut belongs to a group
-    if (this.keyboardService.hasGroupShortcut('editor', 'bold')) {
-      // Remove specific shortcut from a group
-      this.keyboardService.unregisterGroupShortcut('editor', 'bold');
+    // Check if a shortcut is registered
+    if (this.keyboardService.isRegistered('bold')) {
+      // Remove a shortcut - automatically removes it from all groups
+      this.keyboardService.unregister('bold');
     }
 
-    // Remove multiple shortcuts from a group
-    this.keyboardService.unregisterGroupShortcuts('editor', ['bold', 'italic', 'underline']);
+    // Remove multiple shortcuts (automatically removes from groups)
+    this.keyboardService.unregisterMany(['bold', 'italic', 'underline']);
 
     // Get all shortcuts in a group
     const editorShortcuts = this.keyboardService.getGroupShortcuts('editor');
     console.log('Remaining editor shortcuts:', editorShortcuts);
+
+    // Or remove the entire group and all its shortcuts
+    this.keyboardService.unregisterGroup('editor');
   }
 }
 ```
