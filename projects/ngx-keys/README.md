@@ -367,22 +367,46 @@ Conflicts are only checked among **active** shortcuts, not all registered shortc
 
 - `register(shortcut: KeyboardShortcut)` - Register and automatically activate a single shortcut *Throws error on conflicts with active shortcuts only*
 - `registerGroup(groupId: string, shortcuts: KeyboardShortcut[])` - Register and automatically activate a group of shortcuts *Throws error on conflicts with active shortcuts only*
+- `registerMany(shortcuts: KeyboardShortcut[])` - Register multiple shortcuts in a single batch update
 
-**Management Methods:**
+**Unregistration Methods:**
 - `unregister(shortcutId: string)` - Remove a shortcut *Throws error if not found*
 - `unregisterGroup(groupId: string)` - Remove a group *Throws error if not found*
+- `unregisterGroupShortcut(groupId: string, shortcutId: string)` - Remove a specific shortcut from a group
+- `unregisterGroupShortcuts(groupId: string, shortcutIds: string[])` - Remove multiple shortcuts from a group
+- `unregisterMany(ids: string[])` - Unregister multiple shortcuts in a single batch update
+- `unregisterGroups(ids: string[])` - Unregister multiple groups in a single batch update
+- `clearAll()` - Remove all shortcuts, groups, and filters (nuclear reset)
+
+**Activation Methods:**
 - `activate(shortcutId: string)` - Activate a shortcut *Throws error if not registered or would create conflicts*
 - `deactivate(shortcutId: string)` - Deactivate a shortcut *Throws error if not registered*
 - `activateGroup(groupId: string)` - Activate all shortcuts in a group *Throws error if not found or would create conflicts*
 - `deactivateGroup(groupId: string)` - Deactivate all shortcuts in a group *Throws error if not found*
+
+**Filter Methods:**
+- `addFilter(name: string, filter: Function)` - Add a named global filter
+- `removeFilter(name: string)` - Remove a named global filter
+- `clearFilters()` - Remove all global filters
+- `hasFilter(name: string): boolean` - Check if a filter exists
+- `getFilter(name: string)` - Get a filter function by name
+- `getFilterNames(): string[]` - Get all filter names
+- `removeGroupFilter(groupId: string)` - Remove filter from a group
+- `removeShortcutFilter(shortcutId: string)` - Remove filter from a shortcut
+- `clearAllGroupFilters()` - Remove all group filters
+- `clearAllShortcutFilters()` - Remove all shortcut filters
+- `hasGroupFilter(groupId: string): boolean` - Check if group has a filter
+- `hasShortcutFilter(shortcutId: string): boolean` - Check if shortcut has a filter
 
 **Query Methods:**
 - `isActive(shortcutId: string): boolean` - Check if a shortcut is active
 - `isRegistered(shortcutId: string): boolean` - Check if a shortcut is registered
 - `isGroupActive(groupId: string): boolean` - Check if a group is active
 - `isGroupRegistered(groupId: string): boolean` - Check if a group is registered
+- `hasGroupShortcut(groupId: string, shortcutId: string): boolean` - Check if shortcut exists in group
 - `getShortcuts(): ReadonlyMap<string, KeyboardShortcut>` - Get all registered shortcuts
 - `getGroups(): ReadonlyMap<string, KeyboardShortcutGroup>` - Get all registered groups
+- `getGroupShortcuts(groupId: string): KeyboardShortcut[]` - Get all shortcuts in a specific group
 
 **Utility Methods:**
 - `formatShortcutForUI(shortcut: KeyboardShortcut): KeyboardShortcutUI` - Format a shortcut for display
@@ -683,6 +707,127 @@ export class BatchUpdateComponent {
 
   private action1() { /* implementation */ }
   private action2() { /* implementation */ }
+}
+```
+
+### Bulk Registration and Unregistration
+
+Register or unregister multiple shortcuts efficiently:
+
+```typescript
+import { Component, inject } from '@angular/core';
+import { KeyboardShortcuts } from 'ngx-keys';
+
+export class MyComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+
+  setupToolbarShortcuts() {
+    // Register multiple shortcuts at once
+    this.keyboardService.registerMany([
+      {
+        id: 'save',
+        keys: ['ctrl', 's'],
+        macKeys: ['meta', 's'],
+        action: () => this.save(),
+        description: 'Save document'
+      },
+      {
+        id: 'save-as',
+        keys: ['ctrl', 'shift', 's'],
+        macKeys: ['meta', 'shift', 's'],
+        action: () => this.saveAs(),
+        description: 'Save as...'
+      },
+      {
+        id: 'print',
+        keys: ['ctrl', 'p'],
+        macKeys: ['meta', 'p'],
+        action: () => this.print(),
+        description: 'Print document'
+      }
+    ]);
+  }
+
+  cleanup() {
+    // Unregister multiple shortcuts at once
+    this.keyboardService.unregisterMany(['save', 'save-as', 'print']);
+    
+    // Or unregister entire groups
+    this.keyboardService.unregisterGroups(['toolbar', 'menu']);
+    
+    // Or clear everything
+    this.keyboardService.clearAll();
+  }
+
+  private save() { /* implementation */ }
+  private saveAs() { /* implementation */ }
+  private print() { /* implementation */ }
+}
+```
+
+### Managing Group Shortcuts
+
+Remove individual shortcuts from groups and query group contents:
+
+```typescript
+import { Component, inject } from '@angular/core';
+import { KeyboardShortcuts } from 'ngx-keys';
+
+export class MyComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+
+  manageEditorGroup() {
+    // Check if a shortcut belongs to a group
+    if (this.keyboardService.hasGroupShortcut('editor', 'bold')) {
+      // Remove specific shortcut from a group
+      this.keyboardService.unregisterGroupShortcut('editor', 'bold');
+    }
+
+    // Remove multiple shortcuts from a group
+    this.keyboardService.unregisterGroupShortcuts('editor', ['bold', 'italic', 'underline']);
+
+    // Get all shortcuts in a group
+    const editorShortcuts = this.keyboardService.getGroupShortcuts('editor');
+    console.log('Remaining editor shortcuts:', editorShortcuts);
+  }
+}
+```
+
+### Filter Management
+
+Remove filters when no longer needed:
+
+```typescript
+import { Component, inject } from '@angular/core';
+import { KeyboardShortcuts } from 'ngx-keys';
+
+export class MyComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+
+  setupModalFilters() {
+    // Add filters for modal context
+    this.keyboardService.addGroupFilter('navigation', () => this.isModalOpen);
+    this.keyboardService.addShortcutFilter('global-search', () => this.isModalOpen);
+  }
+
+  cleanupModalFilters() {
+    // Check if filters exist
+    if (this.keyboardService.hasGroupFilter('navigation')) {
+      // Remove specific group filter
+      this.keyboardService.removeGroupFilter('navigation');
+    }
+
+    if (this.keyboardService.hasShortcutFilter('global-search')) {
+      // Remove specific shortcut filter
+      this.keyboardService.removeShortcutFilter('global-search');
+    }
+
+    // Or clear all filters at once
+    this.keyboardService.clearAllGroupFilters();
+    this.keyboardService.clearAllShortcutFilters();
+  }
+
+  private isModalOpen = false;
 }
 ```
 

@@ -33,6 +33,7 @@ export interface MockShortcutConfig {
   description?: string;
   action?: () => void;
   activeUntil?: unknown;
+  filter?: (event: KeyboardEvent) => boolean;
 }
 
 /**
@@ -82,6 +83,7 @@ export function createMockShortcut(config: MockShortcutConfig = {}): KeyboardSho
     action: defaultAction,
     description: config.description || 'Test shortcut',
     ...(config.activeUntil !== undefined && { activeUntil: config.activeUntil as any }),
+    ...(config.filter !== undefined && { filter: config.filter }),
   };
 
   // Support both single-step and multi-step shortcuts

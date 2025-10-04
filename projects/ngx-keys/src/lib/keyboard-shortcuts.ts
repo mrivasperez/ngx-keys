@@ -412,6 +412,64 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   /**
+   * Unregister a specific shortcut from a group
+   * @param groupId - The group ID
+   * @param shortcutId - The shortcut ID to remove
+   * @throws KeyboardShortcutError if group doesn't exist or shortcut not found in group
+   */
+  unregisterGroupShortcut(groupId: string, shortcutId: string): void {
+    const group = this.groups.get(groupId);
+    if (!group) {
+      throw KeyboardShortcutsErrorFactory.cannotUnregisterGroup(groupId);
+    }
+
+    const shortcut = this.shortcuts.get(shortcutId);
+    if (!shortcut || this.shortcutToGroup.get(shortcutId) !== groupId) {
+      throw KeyboardShortcutsErrorFactory.cannotUnregisterShortcut(shortcutId);
+    }
+
+    // Remove from shortcuts map
+    this.shortcuts.delete(shortcutId);
+    this.activeShortcuts.delete(shortcutId);
+    this.shortcutToGroup.delete(shortcutId);
+
+    // Update group's shortcuts array
+    const updatedShortcuts = group.shortcuts.filter(s => s.id !== shortcutId);
+    
+    this.groups.set(groupId, {
+      ...group,
+      shortcuts: updatedShortcuts
+    });
+
+    // Trigger state update
+    this.updateState();
+  }
+
+  /**
+   * Unregister multiple shortcuts from a group
+   * @param groupId - The group ID
+   * @param shortcutIds - Array of shortcut IDs to remove
+   */
+  unregisterGroupShortcuts(groupId: string, shortcutIds: string[]): void {
+    this.batchUpdate(() => {
+      shortcutIds.forEach(id => this.unregisterGroupShortcut(groupId, id));
+    });
+  }
+
+  /**
+   * Check if a specific shortcut exists in a group
+   * @param groupId - The group ID
+   * @param shortcutId - The shortcut ID to check
+   * @returns True if the shortcut exists in the group
+   */
+  hasGroupShortcut(groupId: string, shortcutId: string): boolean {
+    const group = this.groups.get(groupId);
+    if (!group) return false;
+    
+    return this.shortcutToGroup.get(shortcutId) === groupId;
+  }
+
+  /**
    * Activate a single keyboard shortcut
    * @throws KeyboardShortcutError if shortcut ID doesn't exist or if activation would create key conflicts
    */
@@ -604,6 +662,165 @@ export class KeyboardShortcuts implements OnDestroy {
    */
   hasFilter(name: string): boolean {
     return this.globalFilters.has(name);
+  }
+
+  /**
+   * Remove the filter from a specific group
+   * @param groupId - The group ID
+   * @throws KeyboardShortcutError if group doesn't exist
+   */
+  removeGroupFilter(groupId: string): void {
+    const group = this.groups.get(groupId);
+    if (!group) {
+      throw KeyboardShortcutsErrorFactory.cannotDeactivateGroup(groupId);
+    }
+
+    if (!group.filter) {
+      // No filter to remove, silently succeed
+      return;
+    }
+
+    this.groups.set(groupId, {
+      ...group,
+      filter: undefined
+    });
+
+    this.updateState();
+  }
+
+  /**
+   * Remove the filter from a specific shortcut
+   * @param shortcutId - The shortcut ID
+   * @throws KeyboardShortcutError if shortcut doesn't exist
+   */
+  removeShortcutFilter(shortcutId: string): void {
+    const shortcut = this.shortcuts.get(shortcutId);
+    if (!shortcut) {
+      throw KeyboardShortcutsErrorFactory.cannotDeactivateShortcut(shortcutId);
+    }
+
+    if (!shortcut.filter) {
+      // No filter to remove, silently succeed
+      return;
+    }
+
+    this.shortcuts.set(shortcutId, {
+      ...shortcut,
+      filter: undefined
+    });
+
+    this.updateState();
+  }
+
+  /**
+   * Remove all filters from all groups
+   */
+  clearAllGroupFilters(): void {
+    this.batchUpdate(() => {
+      this.groups.forEach((group, id) => {
+        if (group.filter) {
+          this.removeGroupFilter(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * Remove all filters from all shortcuts
+   */
+  clearAllShortcutFilters(): void {
+    this.batchUpdate(() => {
+      this.shortcuts.forEach((shortcut, id) => {
+        if (shortcut.filter) {
+          this.removeShortcutFilter(id);
+        }
+      });
+    });
+  }
+
+  /**
+   * Check if a group has a filter
+   * @param groupId - The group ID
+   * @returns True if the group has a filter
+   */
+  hasGroupFilter(groupId: string): boolean {
+    const group = this.groups.get(groupId);
+    return !!group?.filter;
+  }
+
+  /**
+   * Check if a shortcut has a filter
+   * @param shortcutId - The shortcut ID
+   * @returns True if the shortcut has a filter
+   */
+  hasShortcutFilter(shortcutId: string): boolean {
+    const shortcut = this.shortcuts.get(shortcutId);
+    return !!shortcut?.filter;
+  }
+
+  /**
+   * Register multiple shortcuts in a single batch update
+   * @param shortcuts - Array of shortcuts to register
+   */
+  registerMany(shortcuts: KeyboardShortcut[]): void {
+    this.batchUpdate(() => {
+      shortcuts.forEach(shortcut => this.register(shortcut));
+    });
+  }
+
+  /**
+   * Unregister multiple shortcuts in a single batch update
+   * @param ids - Array of shortcut IDs to unregister
+   */
+  unregisterMany(ids: string[]): void {
+    this.batchUpdate(() => {
+      ids.forEach(id => this.unregister(id));
+    });
+  }
+
+  /**
+   * Unregister multiple groups in a single batch update
+   * @param ids - Array of group IDs to unregister
+   */
+  unregisterGroups(ids: string[]): void {
+    this.batchUpdate(() => {
+      ids.forEach(id => this.unregisterGroup(id));
+    });
+  }
+
+  /**
+   * Clear all shortcuts and groups (nuclear reset)
+   */
+  clearAll(): void {
+    this.batchUpdate(() => {
+      this.shortcuts.clear();
+      this.groups.clear();
+      this.activeShortcuts.clear();
+      this.activeGroups.clear();
+      this.shortcutToGroup.clear();
+      this.globalFilters.clear();
+      this.clearCurrentlyDownKeys();
+      this.clearPendingSequence();
+    });
+  }
+
+  /**
+   * Get all shortcuts belonging to a specific group
+   * @param groupId - The group ID
+   * @returns Array of shortcuts in the group
+   */
+  getGroupShortcuts(groupId: string): KeyboardShortcut[] {
+    const group = this.groups.get(groupId);
+    if (!group) return [];
+    
+    return [...group.shortcuts];
+  }
+
+  /**
+   * Normalize a key to lowercase for consistent comparison
+   */
+  private normalizeKey(key: string): string {
+    return key.toLowerCase();
   }
 
   /**
@@ -854,6 +1071,10 @@ export class KeyboardShortcuts implements OnDestroy {
       // active when the user switches tabs or minimizes the window.
       this.clearCurrentlyDownKeys();
       this.clearPendingSequence();
+    } else if (this.document.visibilityState === 'visible') {
+      // When returning to visibility, clear keys to avoid stale state
+      // from keys that may have been released while document was hidden
+      this.clearCurrentlyDownKeys();
     }
   }
 
