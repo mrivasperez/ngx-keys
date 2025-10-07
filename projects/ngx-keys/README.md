@@ -10,8 +10,9 @@ A lightweight, reactive Angular service for managing keyboard shortcuts with sig
 - **🌍 Cross-Platform**: Automatic Mac/PC key display formatting
 - **🔄 Dynamic Management**: Add, remove, activate/deactivate shortcuts at runtime
 - **📁 Group Management**: Organize shortcuts into logical groups
-- **� Smart Conflict Detection**: Register multiple shortcuts with same keys when not simultaneously active
-- **�🪶 Lightweight**: Zero dependencies, minimal bundle impact
+- **⚙️ Configurable**: Customize sequence timeout and other behavior via dependency injection
+- **🔍 Smart Conflict Detection**: Register multiple shortcuts with same keys when not simultaneously active
+- **🪶 Lightweight**: Zero dependencies, minimal bundle impact
 
 ## Installation
 
@@ -189,11 +190,28 @@ this.keyboardService.register({
 });
 ```
 
+**Configuring Sequence Timeout**
+
+By default, multi-step shortcuts must complete within 2000ms (2 seconds). Customize this globally:
+
+```typescript
+import { ApplicationConfig } from '@angular/core';
+import { KEYBOARD_SHORTCUTS_CONFIG } from 'ngx-keys';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    {
+      provide: KEYBOARD_SHORTCUTS_CONFIG,
+      useValue: { sequenceTimeoutMs: 3000 }  // 3 seconds
+    }
+  ]
+};
+```
+
 **Important behavior notes**
 
-- Default sequence timeout: the service requires the next step to be entered within 2000ms (2 seconds) of the previous step; otherwise the pending sequence is cleared. This timeout is intentionally conservative and can be changed in future releases or exposed per-shortcut if needed.
-- Steps are order-sensitive. `steps: [['ctrl','k'], ['s']]` is different from `steps: [['s'], ['ctrl','k']]`.
-- Existing single-step `keys` / `macKeys` remain supported and continue to work as before.
+- **Sequence timeout**: Steps must be entered within the configured timeout (default 2000ms) or the sequence is cleared.
+- **Order-sensitive**: Steps are order-sensitive. `steps: [['ctrl','k'], ['s']]` is different from `steps: [['s'], ['ctrl','k']]`.
 
 
 Use the `activate()` and `deactivate()` methods for dynamic control after registration:
