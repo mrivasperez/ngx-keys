@@ -1,5 +1,5 @@
-import { KeyboardShortcuts } from './keyboard-shortcuts';
-import { KeyboardShortcut } from './keyboard-shortcut.interface';
+import { KeyboardShortcuts } from '../core/keyboard-shortcuts.service';
+import { KeyboardShortcut } from '../models/keyboard-shortcut.interface';
 import { Observable, of } from 'rxjs';
 import { DEFAULT_TEST_STEP_DELAY_MS } from './test-constants';
 

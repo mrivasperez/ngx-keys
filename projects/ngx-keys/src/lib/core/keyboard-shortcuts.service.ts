@@ -8,8 +8,8 @@ import {
   OnDestroy,
   signal,
 } from '@angular/core';
-import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutFilter, KeyboardShortcutGroup, KeyboardShortcutGroupOptions, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
-import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
+import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutFilter, KeyboardShortcutGroup, KeyboardShortcutGroupOptions, KeyboardShortcutUI, KeyStep } from '../models/keyboard-shortcut.interface'
+import { KeyboardShortcutsErrorFactory } from '../errors/keyboard-shortcuts.errors';
 import { Observable, take } from 'rxjs';
 import {
   DEFAULT_SEQUENCE_TIMEOUT_MS,
@@ -22,7 +22,7 @@ import {
   MIN_COUNT_ONE,
   MIN_KEY_LENGTH,
   KEYBOARD_SHORTCUTS_CONFIG
-} from './keyboard-shortcuts.constants';
+} from '../config/keyboard-shortcuts.config';
 
 /**
  * Type guard to detect KeyboardShortcutGroupOptions at runtime.

@@ -1,5 +1,5 @@
-import { KeyboardShortcut } from './keyboard-shortcut.interface';
-import { KeyboardShortcutsErrors } from './keyboard-shortcuts.errors';
+import { KeyboardShortcut } from '../models/keyboard-shortcut.interface';
+import { KeyboardShortcutsErrors } from '../errors/keyboard-shortcuts.errors';
 import * as ngCore from '@angular/core';
 import { of } from 'rxjs';
 import {
@@ -12,9 +12,9 @@ import {
   createMultiStepMockShortcut,
   dispatchKeyEvent,
   dispatchWindowBlur,
-} from './test-utils';
-import { SHORT_TEST_DELAY_MS, STANDARD_TEST_DELAY_MS, SEQUENCE_TIMEOUT_TEST_MS } from './test-constants';
-import { KeyboardShortcuts } from './keyboard-shortcuts';
+} from '../testing/test-utils';
+import { SHORT_TEST_DELAY_MS, STANDARD_TEST_DELAY_MS, SEQUENCE_TIMEOUT_TEST_MS } from '../testing/test-constants';
+import { KeyboardShortcuts } from './keyboard-shortcuts.service';
 import { TestBed } from '@angular/core/testing';
 
 describe('KeyboardShortcuts', () => {
