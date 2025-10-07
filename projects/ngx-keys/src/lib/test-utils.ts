@@ -1,6 +1,7 @@
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { KeyboardShortcut } from './keyboard-shortcut.interface';
 import { Observable, of } from 'rxjs';
+import { DEFAULT_TEST_STEP_DELAY_MS } from './test-constants';
 
 /**
  * Test utilities for ngx-keys library testing.
@@ -183,7 +184,7 @@ export function createMultiStepMockShortcut(config: {
 export function simulateMultiStepSequence(
   service: KeyboardShortcuts,
   steps: string[][],
-  delay: number = 100
+  delay: number = DEFAULT_TEST_STEP_DELAY_MS
 ): void {
   steps.forEach((step, index) => {
     setTimeout(() => {

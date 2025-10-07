@@ -11,6 +11,18 @@ import {
 import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutFilter, KeyboardShortcutGroup, KeyboardShortcutGroupOptions, KeyboardShortcutUI, KeyStep } from './keyboard-shortcut.interface'
 import { KeyboardShortcutsErrorFactory } from './keyboard-shortcuts.errors';
 import { Observable, take } from 'rxjs';
+import {
+  DEFAULT_SEQUENCE_TIMEOUT_MS,
+  INITIAL_STATE_VERSION,
+  STATE_VERSION_INCREMENT,
+  FIRST_INDEX,
+  FIRST_STEP_INDEX,
+  SECOND_STEP_INDEX,
+  SINGLE_STEP_LENGTH,
+  MIN_COUNT_ONE,
+  MIN_KEY_LENGTH,
+  KEYBOARD_SHORTCUTS_CONFIG
+} from './keyboard-shortcuts.constants';
 
 /**
  * Type guard to detect KeyboardShortcutGroupOptions at runtime.
@@ -47,6 +59,7 @@ export class KeyboardShortcuts implements OnDestroy {
   private static readonly MODIFIER_KEYS = new Set(['control', 'alt', 'shift', 'meta']);
   private readonly document = inject(DOCUMENT);
   private readonly window = this.document.defaultView!;
+  private readonly config = inject(KEYBOARD_SHORTCUTS_CONFIG);
 
   private readonly shortcuts = new Map<string, KeyboardShortcut>();
   private readonly groups = new Map<string, KeyboardShortcutGroup>();
@@ -68,7 +81,7 @@ export class KeyboardShortcuts implements OnDestroy {
     groups: new Map<string, KeyboardShortcutGroup>(),
     activeShortcuts: new Set<string>(),
     activeGroups: new Set<string>(),
-    version: 0 // for change detection optimization
+    version: INITIAL_STATE_VERSION // for change detection optimization
   });
 
   // Primary computed signal - consumers derive what they need from this
@@ -108,8 +121,8 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly blurListener = this.handleWindowBlur.bind(this);
   private readonly visibilityListener = this.handleVisibilityChange.bind(this);
   private isListening = false;
-  /** Default timeout (ms) for completing a multi-step sequence */
-  protected sequenceTimeout = 2000;
+  /** Timeout (ms) for completing a multi-step sequence */
+  protected readonly sequenceTimeout: number;
 
   /** Runtime state for multi-step sequences */
   private pendingSequence: {
@@ -119,6 +132,8 @@ export class KeyboardShortcuts implements OnDestroy {
   } | null = null;
 
   constructor() {
+    this.sequenceTimeout = this.config.sequenceTimeoutMs ?? DEFAULT_SEQUENCE_TIMEOUT_MS;
+    
     afterNextRender(() => {
       this.startListening();
     });
@@ -137,7 +152,7 @@ export class KeyboardShortcuts implements OnDestroy {
       groups: new Map(this.groups),
       activeShortcuts: new Set(this.activeShortcuts),
       activeGroups: new Set(this.activeGroups),
-      version: current.version + 1
+      version: current.version + STATE_VERSION_INCREMENT
     }));
   }
 
@@ -189,15 +204,15 @@ export class KeyboardShortcuts implements OnDestroy {
 
     // If the first element is an array, assume steps is string[][]
     const normalized = this.normalizeToSteps(steps as KeyStep[] | string[]);
-    if (normalized.length === 0) return '';
-    if (normalized.length === 1) return this.formatKeysForDisplay(normalized[0], isMac);
+    if (normalized.length === MIN_KEY_LENGTH) return '';
+    if (normalized.length === SINGLE_STEP_LENGTH) return this.formatKeysForDisplay(normalized[FIRST_INDEX], isMac);
     return normalized.map(step => this.formatKeysForDisplay(step, isMac)).join(', ');
   }
 
   private normalizeToSteps(input: KeyStep[] | string[]): KeyStep[] {
     if (!input) return [];
     // If first element is an array, assume already KeyStep[]
-    if (Array.isArray(input[0])) {
+    if (Array.isArray(input[FIRST_INDEX])) {
       return input as KeyStep[];
     }
     // Single step array
@@ -326,11 +341,11 @@ export class KeyboardShortcuts implements OnDestroy {
       }
     });
 
-    if (duplicateIds.length > 0) {
+    if (duplicateIds.length > MIN_KEY_LENGTH) {
       throw KeyboardShortcutsErrorFactory.shortcutIdsAlreadyRegistered(duplicateIds);
     }
 
-    if (keyConflicts.length > 0) {
+    if (keyConflicts.length > MIN_KEY_LENGTH) {
       throw KeyboardShortcutsErrorFactory.keyConflictsInGroup(keyConflicts);
     }
 
@@ -345,7 +360,7 @@ export class KeyboardShortcuts implements OnDestroy {
       }
     });
 
-    if (duplicatesInGroup.length > 0) {
+    if (duplicatesInGroup.length > MIN_KEY_LENGTH) {
       throw KeyboardShortcutsErrorFactory.duplicateShortcutsInGroup(duplicatesInGroup);
     }
 
@@ -424,7 +439,7 @@ export class KeyboardShortcuts implements OnDestroy {
 
     // Check for conflicts that would be created by activation
     const conflicts = this.findActivationConflicts(shortcutId);
-    if (conflicts.length > 0) {
+    if (conflicts.length > MIN_KEY_LENGTH) {
       throw KeyboardShortcutsErrorFactory.activationKeyConflict(shortcutId, conflicts);
     }
 
@@ -462,7 +477,7 @@ export class KeyboardShortcuts implements OnDestroy {
       allConflicts.push(...conflicts);
     });
 
-    if (allConflicts.length > 0) {
+    if (allConflicts.length > MIN_KEY_LENGTH) {
       throw KeyboardShortcutsErrorFactory.groupActivationKeyConflict(groupId, allConflicts);
     }
 
@@ -846,7 +861,7 @@ export class KeyboardShortcuts implements OnDestroy {
     // Fast path: if any global filter blocks this event, bail out before
     // scanning all active shortcuts. This drastically reduces per-event work
     // when filters are commonly blocking (e.g., while typing in inputs).
-    if (this.globalFilters.size > 0) {
+    if (this.globalFilters.size > MIN_KEY_LENGTH) {
       for (const f of this.globalFilters.values()) {
         if (!f(event)) {
           // Also clear any pending multi-step sequence – entering a globally
@@ -890,7 +905,7 @@ export class KeyboardShortcuts implements OnDestroy {
         if (expected && this.keysMatch(stepPressed, expected)) {
           // Advance sequence
           clearTimeout(pending.timerId);
-          pending.stepIndex += 1;
+          pending.stepIndex += STATE_VERSION_INCREMENT;
 
           if (pending.stepIndex >= normalizedSteps.length) {
             // Completed - check filters before executing
@@ -939,7 +954,7 @@ export class KeyboardShortcuts implements OnDestroy {
         : (shortcut.steps ?? shortcut.keys ?? shortcut.macSteps ?? shortcut.macKeys ?? []);
       const normalizedSteps = this.normalizeToSteps(steps as KeyStep[] | string[]);
 
-      const firstStep = normalizedSteps[0];
+      const firstStep = normalizedSteps[FIRST_INDEX];
 
       // Decide which pressed-keys representation to use for this shortcut's
       // expected step: if it requires multiple non-modifier keys, treat it as
@@ -947,7 +962,7 @@ export class KeyboardShortcuts implements OnDestroy {
       // interference from previously pressed non-modifier keys.
   const nonModifierCount = firstStep.filter(k => !KeyboardShortcuts.MODIFIER_KEYS.has(k.toLowerCase())).length;
       // Normalize pressed keys to a Set<string> for consistent typing
-      const pressedForStep: Set<string> = nonModifierCount > 1
+      const pressedForStep: Set<string> = nonModifierCount > MIN_COUNT_ONE
         ? this.buildPressedKeysForMatch(event)
         : this.getPressedKeys(event);
 
@@ -957,7 +972,7 @@ export class KeyboardShortcuts implements OnDestroy {
           continue; // Skip this shortcut due to filters
         }
 
-        if (normalizedSteps.length === 1) {
+        if (normalizedSteps.length === SINGLE_STEP_LENGTH) {
           // single-step
           event.preventDefault();
           event.stopPropagation();
@@ -974,7 +989,7 @@ export class KeyboardShortcuts implements OnDestroy {
           }
           this.pendingSequence = {
             shortcutId: shortcut.id,
-            stepIndex: 1,
+            stepIndex: SECOND_STEP_INDEX,
             timerId: setTimeout(() => { this.pendingSequence = null; }, this.sequenceTimeout)
           };
           event.preventDefault();
@@ -1056,7 +1071,7 @@ export class KeyboardShortcuts implements OnDestroy {
       return;
     }
 
-    if (key && key.length > 0) {
+    if (key && key.length > MIN_KEY_LENGTH) {
       this.currentlyDownKeys.add(key);
     }
   }
@@ -1083,7 +1098,7 @@ export class KeyboardShortcuts implements OnDestroy {
     // Add modifiers first
     modifiers.forEach(m => result.add(m));
 
-    if (nonModifierKeys.length > 0) {
+    if (nonModifierKeys.length > MIN_KEY_LENGTH) {
       nonModifierKeys.forEach(k => result.add(k.toLowerCase()));
       return result;
     }
@@ -1148,7 +1163,7 @@ export class KeyboardShortcuts implements OnDestroy {
   /** Compare two multi-step sequences for equality */
   protected stepsMatch(a: string[][], b: string[][]): boolean {
     if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
+    for (let i = FIRST_INDEX; i < a.length; i++) {
       if (!this.keysMatch(a[i], b[i])) return false;
     }
     return true;
@@ -1196,7 +1211,7 @@ export class KeyboardShortcuts implements OnDestroy {
    */
   protected precomputeBlockedGroups(event: KeyboardEvent): Set<string> {
     const blocked = new Set<string>();
-    if (this.activeGroups.size === 0) return blocked;
+    if (this.activeGroups.size === MIN_KEY_LENGTH) return blocked;
     for (const groupId of this.activeGroups) {
       const group = this.groups.get(groupId);
       if (group && group.filter && !group.filter(event)) {

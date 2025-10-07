@@ -13,6 +13,7 @@ import {
   dispatchKeyEvent,
   dispatchWindowBlur,
 } from './test-utils';
+import { SHORT_TEST_DELAY_MS, STANDARD_TEST_DELAY_MS, SEQUENCE_TIMEOUT_TEST_MS } from './test-constants';
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { TestBed } from '@angular/core/testing';
 
@@ -852,7 +853,7 @@ describe('KeyboardShortcuts', () => {
         dispatchKeyEvent(new KeyboardEvent('keydown', { key: 's' }));
         expect(multiAction).not.toHaveBeenCalled();
         done();
-      }, 2200);
+      }, SEQUENCE_TIMEOUT_TEST_MS);
     });
   });
 
@@ -874,12 +875,12 @@ describe('KeyboardShortcuts', () => {
       // Simulate the second step shortly after (plain 's' key)
       setTimeout(() => {
         dispatchKeyEvent(KeyboardEvents.plain('s'));
-      }, 50);
+      }, SHORT_TEST_DELAY_MS);
 
       setTimeout(() => {
         expect(action).toHaveBeenCalled();
         done();
-      }, 200);
+      }, STANDARD_TEST_DELAY_MS);
     });
 
     it('should clear pending multi-step sequence on window blur', () => {
