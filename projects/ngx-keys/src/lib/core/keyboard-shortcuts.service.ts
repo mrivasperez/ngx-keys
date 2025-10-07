@@ -23,6 +23,7 @@ import {
   MIN_KEY_LENGTH,
   KEYBOARD_SHORTCUTS_CONFIG
 } from '../config/keyboard-shortcuts.config';
+import { KeyMatcher } from './utils/key-matcher';
 
 /**
  * Type guard to detect KeyboardShortcutGroupOptions at runtime.
@@ -56,7 +57,6 @@ function isDestroyRefLike(obj: unknown): obj is DestroyRef & { onDestroy: (fn: (
   providedIn: 'root'
 })
 export class KeyboardShortcuts implements OnDestroy {
-  private static readonly MODIFIER_KEYS = new Set(['control', 'alt', 'shift', 'meta']);
   private readonly document = inject(DOCUMENT);
   private readonly window = this.document.defaultView!;
   private readonly config = inject(KEYBOARD_SHORTCUTS_CONFIG);
@@ -960,7 +960,7 @@ export class KeyboardShortcuts implements OnDestroy {
       // expected step: if it requires multiple non-modifier keys, treat it as
       // a chord and use accumulated keys; otherwise use per-event keys to avoid
       // interference from previously pressed non-modifier keys.
-  const nonModifierCount = firstStep.filter(k => !KeyboardShortcuts.MODIFIER_KEYS.has(k.toLowerCase())).length;
+  const nonModifierCount = firstStep.filter(k => !KeyMatcher.isModifierKey(k)).length;
       // Normalize pressed keys to a Set<string> for consistent typing
       const pressedForStep: Set<string> = nonModifierCount > MIN_COUNT_ONE
         ? this.buildPressedKeysForMatch(event)
@@ -1001,9 +1001,9 @@ export class KeyboardShortcuts implements OnDestroy {
   }
 
   protected handleKeyup(event: KeyboardEvent): void {
-    // Remove the key from currentlyDownKeys on keyup
+    // Remove the key from currently DownKeys on keyup
     const key = event.key ? event.key.toLowerCase() : '';
-    if (key && !KeyboardShortcuts.MODIFIER_KEYS.has(key)) {
+    if (key && !KeyMatcher.isModifierKey(key)) {
       this.currentlyDownKeys.delete(key);
     }
   }
@@ -1046,7 +1046,7 @@ export class KeyboardShortcuts implements OnDestroy {
     const key = event.key ? event.key.toLowerCase() : '';
 
     // Ignore modifier-only keydown entries
-    if (KeyboardShortcuts.MODIFIER_KEYS.has(key)) {
+    if (KeyMatcher.isModifierKey(key)) {
       return;
     }
 
@@ -1092,7 +1092,7 @@ export class KeyboardShortcuts implements OnDestroy {
     if (event.metaKey) modifiers.add('meta');
 
   // Collect non-modifier keys from currentlyDownKeys (excluding modifiers)
-  const nonModifierKeys = Array.from(this.currentlyDownKeys).filter(k => !KeyboardShortcuts.MODIFIER_KEYS.has(k));
+  const nonModifierKeys = Array.from(this.currentlyDownKeys).filter(k => !KeyMatcher.isModifierKey(k));
 
     const result = new Set<string>();
     // Add modifiers first
@@ -1105,7 +1105,7 @@ export class KeyboardShortcuts implements OnDestroy {
 
     // Fallback: single main key from the event (existing behavior)
     const key = event.key.toLowerCase();
-    if (!KeyboardShortcuts.MODIFIER_KEYS.has(key)) {
+    if (!KeyMatcher.isModifierKey(key)) {
       result.add(key);
     }
     return result;
@@ -1125,7 +1125,7 @@ export class KeyboardShortcuts implements OnDestroy {
 
     // Add the main key (normalize to lowercase) if it's not a modifier
     const key = (event.key ?? '').toLowerCase();
-    if (key && !KeyboardShortcuts.MODIFIER_KEYS.has(key)) {
+    if (key && !KeyMatcher.isModifierKey(key)) {
       result.add(key);
     }
 
@@ -1137,36 +1137,19 @@ export class KeyboardShortcuts implements OnDestroy {
    * Accepts either a Set<string> (preferred) or an array for backwards compatibility.
    * Uses Set-based comparison: sizes must match and every element in target must exist in pressed.
    */
+  /**
+   * @deprecated Use KeyMatcher.keysMatch() instead
+   */
   protected keysMatch(pressedKeys: Set<string> | string[], targetKeys: string[]): boolean {
-    // Normalize targetKeys into a Set<string> (lowercased)
-    const normalizedTarget = new Set<string>(targetKeys.map(k => k.toLowerCase()));
-
-    // Normalize pressedKeys into a Set<string> if it's an array
-    const pressedSet: Set<string> = Array.isArray(pressedKeys)
-      ? new Set<string>(pressedKeys.map(k => k.toLowerCase()))
-      : new Set<string>(Array.from(pressedKeys).map(k => k.toLowerCase()));
-
-    if (pressedSet.size !== normalizedTarget.size) {
-      return false;
-    }
-
-    // Check if every element in normalizedTarget exists in pressedSet
-    for (const key of normalizedTarget) {
-      if (!pressedSet.has(key)) {
-        return false;
-      }
-    }
-
-    return true;
+    return KeyMatcher.keysMatch(pressedKeys, targetKeys);
   }
 
-  /** Compare two multi-step sequences for equality */
+  /**
+   * Compare two multi-step sequences for equality
+   * @deprecated Use KeyMatcher.stepsMatch() instead
+   */
   protected stepsMatch(a: string[][], b: string[][]): boolean {
-    if (a.length !== b.length) return false;
-    for (let i = FIRST_INDEX; i < a.length; i++) {
-      if (!this.keysMatch(a[i], b[i])) return false;
-    }
-    return true;
+    return KeyMatcher.stepsMatch(a, b);
   }
 
   /** Safely clear any pending multi-step sequence */
