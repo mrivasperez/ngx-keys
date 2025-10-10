@@ -12,7 +12,6 @@ import { KeyboardShortcut, KeyboardShortcutActiveUntil, KeyboardShortcutFilter, 
 import { KeyboardShortcutsErrorFactory } from '../errors/keyboard-shortcuts.errors';
 import { Observable, take } from 'rxjs';
 import {
-  DEFAULT_SEQUENCE_TIMEOUT_MS,
   INITIAL_STATE_VERSION,
   STATE_VERSION_INCREMENT,
   FIRST_INDEX,
@@ -121,19 +120,15 @@ export class KeyboardShortcuts implements OnDestroy {
   private readonly blurListener = this.handleWindowBlur.bind(this);
   private readonly visibilityListener = this.handleVisibilityChange.bind(this);
   private isListening = false;
-  /** Timeout (ms) for completing a multi-step sequence */
-  protected readonly sequenceTimeout: number;
 
   /** Runtime state for multi-step sequences */
   private pendingSequence: {
     shortcutId: string;
     stepIndex: number;
-    timerId: any;
+    timerId: any | null;
   } | null = null;
 
   constructor() {
-    this.sequenceTimeout = this.config.sequenceTimeoutMs ?? DEFAULT_SEQUENCE_TIMEOUT_MS;
-    
     afterNextRender(() => {
       this.startListening();
     });
@@ -925,8 +920,10 @@ export class KeyboardShortcuts implements OnDestroy {
             return;
           }
 
-          // Reset timer for next step
-          pending.timerId = setTimeout(() => { this.pendingSequence = null; }, this.sequenceTimeout);
+          // Reset timer for next step (only if shortcut has timeout configured)
+          if (shortcut.sequenceTimeout !== undefined) {
+            pending.timerId = setTimeout(() => { this.pendingSequence = null; }, shortcut.sequenceTimeout);
+          }
           return;
         } else {
           // Cancel pending if doesn't match
@@ -987,10 +984,13 @@ export class KeyboardShortcuts implements OnDestroy {
           if (this.pendingSequence) {
             this.clearPendingSequence();
           }
+          const timerId = shortcut.sequenceTimeout !== undefined
+            ? setTimeout(() => { this.pendingSequence = null; }, shortcut.sequenceTimeout)
+            : null;
           this.pendingSequence = {
             shortcutId: shortcut.id,
             stepIndex: SECOND_STEP_INDEX,
-            timerId: setTimeout(() => { this.pendingSequence = null; }, this.sequenceTimeout)
+            timerId
           };
           event.preventDefault();
           event.stopPropagation();
@@ -1156,7 +1156,10 @@ export class KeyboardShortcuts implements OnDestroy {
   private clearPendingSequence(): void {
     if (!this.pendingSequence) return;
     try {
-      clearTimeout(this.pendingSequence.timerId);
+      // Only clear timeout if one was set
+      if (this.pendingSequence.timerId !== null) {
+        clearTimeout(this.pendingSequence.timerId);
+      }
     } catch { /* ignore */ }
     this.pendingSequence = null;
   }

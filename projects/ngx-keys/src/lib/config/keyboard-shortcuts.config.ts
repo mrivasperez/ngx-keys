@@ -4,12 +4,7 @@ import { InjectionToken } from '@angular/core';
  * Configuration options for the KeyboardShortcuts service.
  */
 export interface KeyboardShortcutsConfig {
-  /**
-   * Timeout in milliseconds for completing a multi-step keyboard shortcut sequence.
-   * If the next step is not entered within this time, the pending sequence is cleared.
-   * @default 2000ms (2 seconds)
-   */
-  sequenceTimeoutMs?: number;
+  // Reserved for future configuration options
 }
 
 /**
@@ -20,7 +15,7 @@ export interface KeyboardShortcutsConfig {
  * providers: [
  *   {
  *     provide: KEYBOARD_SHORTCUTS_CONFIG,
- *     useValue: { sequenceTimeoutMs: 3000 }
+ *     useValue: {}
  *   }
  * ]
  * ```
@@ -29,16 +24,9 @@ export const KEYBOARD_SHORTCUTS_CONFIG = new InjectionToken<KeyboardShortcutsCon
   'KEYBOARD_SHORTCUTS_CONFIG',
   {
     providedIn: 'root',
-    factory: () => ({ sequenceTimeoutMs: DEFAULT_SEQUENCE_TIMEOUT_MS })
+    factory: () => ({})
   }
 );
-
-/**
- * Default timeout in milliseconds for completing a multi-step keyboard shortcut sequence.
- * If the next step is not entered within this time, the pending sequence is cleared.
- * @default 2000ms (2 seconds)
- */
-export const DEFAULT_SEQUENCE_TIMEOUT_MS = 2000;
 
 /**
  * Initial version number for state change detection.

@@ -22,8 +22,15 @@ export const SHORT_TEST_DELAY_MS = 50;
 export const STANDARD_TEST_DELAY_MS = 200;
 
 /**
- * Timeout longer than the default sequence timeout (2000ms) to test sequence expiration.
- * Should be DEFAULT_SEQUENCE_TIMEOUT_MS + buffer.
- * @default 2200ms
+ * Timeout for testing sequence timeout behavior.
+ * Used when a shortcut has an explicit timeout configured.
+ * @default 1000ms (1 second)
  */
-export const SEQUENCE_TIMEOUT_TEST_MS = 2200;
+export const SEQUENCE_TIMEOUT_TEST_MS = 1000;
+
+/**
+ * Delay longer than SEQUENCE_TIMEOUT_TEST_MS to test sequence expiration.
+ * Should be SEQUENCE_TIMEOUT_TEST_MS + buffer.
+ * @default 1200ms
+ */
+export const SEQUENCE_EXPIRATION_TEST_MS = 1200;

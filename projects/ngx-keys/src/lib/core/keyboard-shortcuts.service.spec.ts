@@ -13,7 +13,7 @@ import {
   dispatchKeyEvent,
   dispatchWindowBlur,
 } from '../testing/test-utils';
-import { SHORT_TEST_DELAY_MS, STANDARD_TEST_DELAY_MS, SEQUENCE_TIMEOUT_TEST_MS } from '../testing/test-constants';
+import { SHORT_TEST_DELAY_MS, STANDARD_TEST_DELAY_MS, SEQUENCE_TIMEOUT_TEST_MS, SEQUENCE_EXPIRATION_TEST_MS } from '../testing/test-constants';
 import { KeyboardShortcuts } from './keyboard-shortcuts.service';
 import { TestBed } from '@angular/core/testing';
 
@@ -842,18 +842,44 @@ describe('KeyboardShortcuts', () => {
         macSteps: [['meta', 'k'], ['s']],
         action: multiAction,
         description: 'Multi-step timeout',
+        sequenceTimeout: SEQUENCE_TIMEOUT_TEST_MS, // Set explicit timeout of 1000ms
       } as any as KeyboardShortcut;
 
       service.register(shortcut);
       // First step
       dispatchKeyEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'k' }));
 
-      // Wait longer than default sequenceTimeout (2s)
+      // Wait longer than the shortcut's configured timeout (1000ms)
       setTimeout(() => {
         dispatchKeyEvent(new KeyboardEvent('keydown', { key: 's' }));
         expect(multiAction).not.toHaveBeenCalled();
         done();
-      }, SEQUENCE_TIMEOUT_TEST_MS);
+      }, SEQUENCE_EXPIRATION_TEST_MS);
+    });
+
+    it('should wait indefinitely for next step when no timeout is configured (default)', (done) => {
+      const multiAction = jasmine.createSpy('multiActionInfinite');
+      const shortcut = {
+        id: 'multi-infinite',
+        steps: [['ctrl', 'k'], ['s']],
+        action: multiAction,
+        description: 'Multi-step infinite wait',
+        // No sequenceTimeout property - should wait indefinitely
+      } as any as KeyboardShortcut;
+
+      service.register(shortcut);
+      // First step
+      dispatchKeyEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'k' }));
+
+      // Wait much longer than the test timeout, but still complete the sequence
+      setTimeout(() => {
+        dispatchKeyEvent(new KeyboardEvent('keydown', { key: 's' }));
+        // Should still execute because there's no timeout
+        setTimeout(() => {
+          expect(multiAction).toHaveBeenCalled();
+          done();
+        }, SHORT_TEST_DELAY_MS);
+      }, SEQUENCE_EXPIRATION_TEST_MS);
     });
   });
 
