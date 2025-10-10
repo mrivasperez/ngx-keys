@@ -1,4 +1,4 @@
-import { InjectionToken } from '@angular/core';
+import { InjectionToken, Provider } from '@angular/core';
 
 /**
  * Configuration options for the KeyboardShortcuts service.
@@ -13,10 +13,7 @@ export interface KeyboardShortcutsConfig {
  * @example
  * ```typescript
  * providers: [
- *   {
- *     provide: KEYBOARD_SHORTCUTS_CONFIG,
- *     useValue: {}
- *   }
+ *   provideKeyboardShortcutsConfig({ sequenceTimeoutMs: Infinity })
  * ]
  * ```
  */
@@ -27,6 +24,25 @@ export const KEYBOARD_SHORTCUTS_CONFIG = new InjectionToken<KeyboardShortcutsCon
     factory: () => ({})
   }
 );
+
+/**
+ * Provides KeyboardShortcuts configuration using Angular's modern provider pattern.
+ * 
+ * @param config - Configuration options for KeyboardShortcuts service
+ * @returns Provider array for use in Angular dependency injection
+ * 
+ * @example
+ * ```typescript
+ * bootstrapApplication(AppComponent, {
+ *   providers: [
+ *     provideKeyboardShortcutsConfig({ sequenceTimeoutMs: Infinity })
+ *   ]
+ * });
+ * ```
+ */
+export function provideKeyboardShortcutsConfig(config: KeyboardShortcutsConfig): Provider[] {
+  return [{ provide: KEYBOARD_SHORTCUTS_CONFIG, useValue: config }];
+}
 
 /**
  * Initial version number for state change detection.

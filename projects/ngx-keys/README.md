@@ -192,7 +192,20 @@ this.keyboardService.register({
 
 **Configuring Sequence Timeout**
 
-By default, multi-step shortcuts must complete within 2000ms (2 seconds). Customize this globally:
+By default, multi-step shortcuts have **no timeout** - users can take as long as they need between steps. You can configure a timeout globally using a provider function:
+
+```typescript
+import { ApplicationConfig } from '@angular/core';
+import { provideKeyboardShortcutsConfig } from 'ngx-keys';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideKeyboardShortcutsConfig({ sequenceTimeoutMs: 2000 })  // 2 seconds
+  ]
+};
+```
+
+Alternatively, you can use the injection token directly:
 
 ```typescript
 import { ApplicationConfig } from '@angular/core';
@@ -202,7 +215,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     {
       provide: KEYBOARD_SHORTCUTS_CONFIG,
-      useValue: { sequenceTimeoutMs: 3000 }  // 3 seconds
+      useValue: { sequenceTimeoutMs: 2000 }  // 2 seconds
     }
   ]
 };
