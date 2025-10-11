@@ -47,6 +47,38 @@ export interface KeyboardShortcut {
    * ```
    */
   filter?: KeyboardShortcutFilter;
+  /**
+   * Optional timeout (in milliseconds) for multi-step sequences.
+   * After this duration of inactivity between steps, the sequence state will reset.
+   * 
+   * @default undefined (no timeout - sequence remains active indefinitely)
+   * 
+   * @remarks
+   * For accessibility, the default behavior (no timeout) is recommended.
+   * Multi-step sequences remain active until completed or the window/document loses focus.
+   * Only specify a timeout for specialized use cases like preventing stuck UI states.
+   * 
+   * @example
+   * ```typescript
+   * // No timeout (default) - waits indefinitely between steps
+   * {
+   *   id: 'save-file',
+   *   steps: [['ctrl', 'k'], ['s']],
+   *   action: () => this.save(),
+   *   description: 'Save file'
+   * }
+   * 
+   * // 5 second timeout - resets if user pauses too long between steps
+   * {
+   *   id: 'quick-action',
+   *   steps: [['ctrl', 'k'], ['q']],
+   *   action: () => this.quickAction(),
+   *   description: 'Quick action',
+   *   sequenceTimeout: 5000
+   * }
+   * ```
+   */
+  sequenceTimeout?: number;
 }
 
 export interface KeyboardShortcutGroup {
