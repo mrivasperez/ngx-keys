@@ -5,6 +5,25 @@ export type KeyboardShortcutActiveUntil = Observable<unknown> | DestroyRef | 'de
 
 export type KeyStep = string[];
 
+/**
+ * Function signature for keyboard shortcut actions.
+ * 
+ * @example
+ * ```typescript
+ * const saveAction: Action = () => {
+ *   console.log('Saving...');
+ * };
+ * 
+ * this.keyboardService.register({
+ *   id: 'save',
+ *   keys: ['ctrl', 's'],
+ *   action: saveAction,
+ *   description: 'Save document'
+ * });
+ * ```
+ */
+export type Action = () => void;
+
 export interface KeyboardShortcut {
   id: string;
   /**
@@ -23,7 +42,7 @@ export interface KeyboardShortcut {
   macKeys?: string[];
   steps?: KeyStep[];
   macSteps?: KeyStep[];
-  action: () => void;
+  action: Action;
   description: string;
   activeUntil?: KeyboardShortcutActiveUntil;
   /**

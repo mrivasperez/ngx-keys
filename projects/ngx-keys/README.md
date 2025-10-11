@@ -239,6 +239,52 @@ this.keyboardService.activate('save');
 
 ## Advanced Usage
 
+### Type-Safe Action Functions
+
+For better type safety and code reusability, use the exported `Action` type when defining action functions:
+
+```typescript
+import { Component, inject } from '@angular/core';
+import { KeyboardShortcuts, Action } from 'ngx-keys';
+
+export class MyComponent {
+  private readonly keyboardService = inject(KeyboardShortcuts);
+
+  // Define reusable, type-safe action functions
+  private readonly saveAction: Action = () => {
+    console.log('Saving document...');
+    this.performSave();
+  };
+
+  private readonly undoAction: Action = () => {
+    console.log('Undoing...');
+    this.performUndo();
+  };
+
+  constructor() {
+    // Use the typed actions in shortcuts
+    this.keyboardService.register({
+      id: 'save',
+      keys: ['ctrl', 's'],
+      macKeys: ['meta', 's'],
+      action: this.saveAction,
+      description: 'Save document'
+    });
+
+    this.keyboardService.register({
+      id: 'undo',
+      keys: ['ctrl', 'z'],
+      macKeys: ['meta', 'z'],
+      action: this.undoAction,
+      description: 'Undo last action'
+    });
+  }
+
+  private performSave() { /* implementation */ }
+  private performUndo() { /* implementation */ }
+}
+```
+
 ### Context-Specific Shortcuts
 
 Register different actions for the same keys in different UI contexts:
@@ -480,6 +526,9 @@ interface KeyboardShortcutUI {
 ### KeyboardShortcut Interface
 
 ```typescript
+// Type for shortcut action functions
+type Action = () => void;
+
 interface KeyboardShortcut {
   id: string;           // Unique identifier
   // Single-step combinations (existing API)
@@ -490,7 +539,7 @@ interface KeyboardShortcut {
   // Each step is an array of keys pressed together. Example: steps: [['ctrl','k'], ['s']]
   steps?: string[][];
   macSteps?: string[][];
-  action: () => void;   // Function to execute
+  action: Action;       // Function to execute
   description: string;  // Human-readable description
 }
 ```
