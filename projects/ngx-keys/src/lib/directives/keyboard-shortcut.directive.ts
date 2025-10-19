@@ -22,7 +22,7 @@ import { Action, KeyStep } from '../models/keyboard-shortcut.interface';
  * @example
  * Basic usage with click trigger:
  * ```html
- * <button ngxKeyboardShortcut
+ * <button ngxKeys
  *         keys="ctrl,s"
  *         description="Save document"
  *         (click)="save()">
@@ -33,7 +33,7 @@ import { Action, KeyStep } from '../models/keyboard-shortcut.interface';
  * @example
  * With custom action:
  * ```html
- * <button ngxKeyboardShortcut
+ * <button ngxKeys
  *         keys="ctrl,s"
  *         description="Save document"
  *         [action]="customSaveAction">
@@ -44,7 +44,7 @@ import { Action, KeyStep } from '../models/keyboard-shortcut.interface';
  * @example
  * Multi-step shortcuts:
  * ```html
- * <button ngxKeyboardShortcut
+ * <button ngxKeys
  *         [steps]="[['ctrl', 'k'], ['ctrl', 's']]"
  *         description="Format document"
  *         (click)="format()">
@@ -55,7 +55,7 @@ import { Action, KeyStep } from '../models/keyboard-shortcut.interface';
  * @example
  * Mac-specific keys:
  * ```html
- * <button ngxKeyboardShortcut
+ * <button ngxKeys
  *         keys="ctrl,s"
  *         macKeys="cmd,s"
  *         description="Save document"
@@ -67,7 +67,7 @@ import { Action, KeyStep } from '../models/keyboard-shortcut.interface';
  * @example
  * On non-interactive elements:
  * ```html
- * <div ngxKeyboardShortcut
+ * <div ngxKeys
  *      keys="?"
  *      description="Show help"
  *      [action]="showHelp">
@@ -76,7 +76,7 @@ import { Action, KeyStep } from '../models/keyboard-shortcut.interface';
  * ```
  */
 @Directive({
-  selector: '[ngxKeyboardShortcut]',
+  selector: '[ngxKeys]',
   standalone: true,
 })
 export class KeyboardShortcutDirective implements OnInit, OnDestroy {
@@ -178,7 +178,7 @@ export class KeyboardShortcutDirective implements OnInit, OnDestroy {
       });
       this.isRegistered = true;
     } catch (error) {
-      console.error(`[ngxKeyboardShortcut] Failed to register shortcut:`, error);
+      console.error(`[ngxKeys] Failed to register shortcut:`, error);
       throw error;
     }
   }
@@ -190,7 +190,7 @@ export class KeyboardShortcutDirective implements OnInit, OnDestroy {
         this.keyboardShortcuts.unregister(this.generatedId);
       } catch (error) {
         // Silently handle unregister errors (shortcut might have been manually removed)
-        console.warn(`[ngxKeyboardShortcut] Failed to unregister shortcut ${this.generatedId}:`, error);
+        console.warn(`[ngxKeys] Failed to unregister shortcut ${this.generatedId}:`, error);
       }
     }
   }
@@ -225,19 +225,19 @@ export class KeyboardShortcutDirective implements OnInit, OnDestroy {
 
     if (!hasSingleStep && !hasMultiStep) {
       throw new Error(
-        `[ngxKeyboardShortcut] Must provide either 'keys'/'macKeys' for single-step shortcuts or 'steps'/'macSteps' for multi-step shortcuts.`
+        `[ngxKeys] Must provide either 'keys'/'macKeys' for single-step shortcuts or 'steps'/'macSteps' for multi-step shortcuts.`
       );
     }
 
     if (hasSingleStep && hasMultiStep) {
       throw new Error(
-        `[ngxKeyboardShortcut] Cannot use both single-step ('keys'/'macKeys') and multi-step ('steps'/'macSteps') inputs simultaneously. Choose one approach.`
+        `[ngxKeys] Cannot use both single-step ('keys'/'macKeys') and multi-step ('steps'/'macSteps') inputs simultaneously. Choose one approach.`
       );
     }
 
     if (!this.description) {
       throw new Error(
-        `[ngxKeyboardShortcut] 'description' input is required.`
+        `[ngxKeys] 'description' input is required.`
       );
     }
   }

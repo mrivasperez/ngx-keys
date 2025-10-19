@@ -14,7 +14,7 @@ import { KeyboardShortcutsErrors } from '../errors/keyboard-shortcuts.errors';
   template: `
     <button
       #testButton
-      ngxKeyboardShortcut
+      ngxKeys
       [keys]="keys"
       [macKeys]="macKeys"
       [steps]="steps"
@@ -518,7 +518,7 @@ describe('KeyboardShortcutDirective', () => {
       imports: [KeyboardShortcutDirective],
       template: `
         <div
-          ngxKeyboardShortcut
+          ngxKeys
           keys="?"
           description="Show help"
           [action]="action"

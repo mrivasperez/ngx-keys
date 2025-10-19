@@ -88,7 +88,7 @@ export class MyComponent {
 
 ### Using the Directive (Declarative Approach)
 
-For a more declarative approach, use the `ngxKeyboardShortcut` directive directly on your elements:
+For a more declarative approach, use the `ngxKeys` directive directly on your elements:
 
 ```typescript
 import { Component } from '@angular/core';
@@ -103,7 +103,7 @@ import { KeyboardShortcutDirective } from 'ngx-keys';
     
     <!-- Directive automatically registers and unregisters shortcuts -->
     <button 
-      ngxKeyboardShortcut
+      ngxKeys
       keys="ctrl,s"
       macKeys="cmd,s"
       description="Save document"
@@ -112,7 +112,7 @@ import { KeyboardShortcutDirective } from 'ngx-keys';
     </button>
     
     <button 
-      ngxKeyboardShortcut
+      ngxKeys
       keys="ctrl,h"
       macKeys="cmd,h"
       description="Show help"
@@ -122,7 +122,7 @@ import { KeyboardShortcutDirective } from 'ngx-keys';
     
     <!-- Multi-step shortcuts work too -->
     <button 
-      ngxKeyboardShortcut
+      ngxKeys
       [steps]="[['ctrl', 'k'], ['ctrl', 'p']]"
       [macSteps]="[['cmd', 'k'], ['cmd', 'p']]"
       description="Open command palette (Ctrl+K then Ctrl+P)"
@@ -132,7 +132,7 @@ import { KeyboardShortcutDirective } from 'ngx-keys';
     
     <!-- Use custom action instead of click -->
     <div 
-      ngxKeyboardShortcut
+      ngxKeys
       keys="?"
       description="Show help overlay"
       [action]="showHelpOverlay">
@@ -665,7 +665,7 @@ A declarative directive for registering keyboard shortcuts directly in templates
 
 #### Selector
 ```typescript
-[ngxKeyboardShortcut]
+[ngxKeys]
 ```
 
 #### Inputs
@@ -705,7 +705,7 @@ The directive adds the following to the host element:
 **Basic button with click trigger:**
 ```html
 <button 
-  ngxKeyboardShortcut
+  ngxKeys
   keys="ctrl,s"
   macKeys="cmd,s"
   description="Save document"
@@ -717,7 +717,7 @@ The directive adds the following to the host element:
 **Multi-step shortcut:**
 ```html
 <button 
-  ngxKeyboardShortcut
+  ngxKeys
   [steps]="[['ctrl', 'k'], ['ctrl', 'd']]"
   [macSteps]="[['cmd', 'k'], ['cmd', 'd']]"
   description="Format document (Ctrl+K then Ctrl+D)"
@@ -729,7 +729,7 @@ The directive adds the following to the host element:
 **Custom action on non-interactive element:**
 ```html
 <div 
-  ngxKeyboardShortcut
+  ngxKeys
   keys="?"
   description="Show help"
   [action]="showHelp">
@@ -740,7 +740,7 @@ The directive adds the following to the host element:
 **Listen to triggered event:**
 ```html
 <button 
-  ngxKeyboardShortcut
+  ngxKeys
   keys="ctrl,s"
   description="Save document"
   (triggered)="onShortcutTriggered()"
@@ -752,7 +752,7 @@ The directive adds the following to the host element:
 **Custom shortcut ID:**
 ```html
 <button 
-  ngxKeyboardShortcut
+  ngxKeys
   keys="ctrl,s"
   description="Save document"
   shortcutId="my-custom-save-shortcut"
