@@ -1,0 +1,13 @@
+/* Layout only */
+.controls {
+  margin: 2rem 0;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .controls {
+    flex-direction: column;
+  }
+}

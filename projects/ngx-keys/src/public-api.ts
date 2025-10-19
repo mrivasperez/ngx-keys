@@ -10,4 +10,4 @@ export {
   provideKeyboardShortcutsConfig
 } from './lib/config/keyboard-shortcuts.config';
 export type { KeyboardShortcutsConfig } from './lib/config/keyboard-shortcuts.config';
-export { KeyMatcher } from './lib/core/utils/key-matcher';
+export { KeyboardShortcutDirective } from './lib/directives/keyboard-shortcut.directive';
