@@ -18,6 +18,10 @@ export const routes: Routes = [
     loadComponent: () => import('./multi-step/multi-step.component').then(m => m.MultiStepComponent)
   },
   {
+    path: 'directive',
+    loadComponent: () => import('./directive-demo/directive-demo.component').then(m => m.DirectiveDemoComponent)
+  },
+  {
     path: '**',
     redirectTo: ''
   }

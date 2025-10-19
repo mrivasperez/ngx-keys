@@ -5,6 +5,7 @@ A lightweight, reactive Angular service for managing keyboard shortcuts with sig
 ## Features
 
 - **🎯 Service-Focused**: Clean, focused API without unnecessary UI components
+- **📝 Declarative Directive**: Optional directive for template-based shortcut registration
 - **⚡ Reactive Signals**: Track active/inactive shortcuts with Angular signals
 - **🔧 UI-Agnostic**: Build your own UI using the provided reactive signals
 - **🌍 Cross-Platform**: Automatic Mac/PC key display formatting
@@ -85,7 +86,110 @@ export class MyComponent {
 }
 ```
 
+### Using the Directive (Declarative Approach)
 
+For a more declarative approach, use the `ngxKeys` directive directly on your elements:
+
+```typescript
+import { Component } from '@angular/core';
+import { KeyboardShortcutDirective } from 'ngx-keys';
+
+@Component({
+  standalone: true,
+  imports: [KeyboardShortcutDirective],
+  template: `
+    <h3>My App</h3>
+    <p>Last action: {{ lastAction }}</p>
+    
+    <!-- Directive automatically registers and unregisters shortcuts -->
+    <button 
+      ngxKeys
+      keys="ctrl,s"
+      macKeys="cmd,s"
+      description="Save document"
+      (click)="save()">
+      Save
+    </button>
+    
+    <button 
+      ngxKeys
+      keys="ctrl,h"
+      macKeys="cmd,h"
+      description="Show help"
+      (click)="showHelp()">
+      Help
+    </button>
+    
+    <!-- Multi-step shortcuts work too -->
+    <button 
+      ngxKeys
+      [steps]="[['ctrl', 'k'], ['ctrl', 'p']]"
+      [macSteps]="[['cmd', 'k'], ['cmd', 'p']]"
+      description="Open command palette (Ctrl+K then Ctrl+P)"
+      (click)="openCommandPalette()">
+      Command Palette
+    </button>
+    
+    <!-- Use custom action instead of click -->
+    <div 
+      ngxKeys
+      keys="?"
+      description="Show help overlay"
+      [action]="showHelpOverlay">
+      Press ? for help
+    </div>
+  `
+})
+export class MyComponent {
+  protected lastAction = 'Try pressing Ctrl+S or Ctrl+H';
+  
+  protected readonly showHelpOverlay = () => {
+    this.lastAction = 'Help overlay displayed!';
+  };
+
+  protected save() {
+    this.lastAction = 'Document saved!';
+  }
+
+  protected showHelp() {
+    this.lastAction = 'Help displayed!';
+  }
+  
+  protected openCommandPalette() {
+    this.lastAction = 'Command palette opened!';
+  }
+}
+```
+
+> [!TIP]
+> The directive automatically:
+> - Registers shortcuts when initialized
+> - Triggers click events on the host element (or executes a custom action)
+> - Unregisters shortcuts when destroyed
+> - Adds a `data-keyboard-shortcut` attribute for styling/testing
+
+**Directive Inputs:**
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `keys` | `string` | Comma-separated keys for single-step shortcut (e.g., `"ctrl,s"`) |
+| `macKeys` | `string` | Comma-separated keys for Mac (e.g., `"cmd,s"`) |
+| `steps` | `string[][]` | Multi-step sequence (e.g., `[['ctrl', 'k'], ['ctrl', 'd']]`) |
+| `macSteps` | `string[][]` | Multi-step sequence for Mac |
+| `description` | `string` | Required. Description of what the shortcut does |
+| `action` | `() => void` | Optional custom action. If not provided, triggers click on host element |
+| `shortcutId` | `string` | Optional custom ID. If not provided, generates unique ID |
+
+**Directive Outputs:**
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `triggered` | `void` | Emitted when the keyboard shortcut is triggered |
+
+**When to use the directive vs. the service:**
+
+- **Use the directive** when shortcuts are tied to specific UI elements and their lifecycle
+- **Use the service** when you need programmatic control, dynamic shortcuts, or shortcuts not tied to elements
 
 ## Explore the Demo
 
@@ -96,6 +200,7 @@ Want to see ngx-keys in action? Check out our comprehensive [demo application](/
 | [**App Component**](/projects/demo/src/app/app.ts)                                 | Global shortcuts           | Single & group registration, cleanup patterns |
 | [**Home Component**](/projects/demo/src/app/home/home.component.ts)                | Reactive UI                | Real-time status display, toggle controls     |
 | [**Feature Component**](/projects/demo/src/app/feature/feature.component.ts)       | Route-specific shortcuts   | Scoped shortcuts, lifecycle management        |
+| [**Directive Demo**](/projects/demo/src/app/directive-demo/directive-demo.component.ts) | Declarative shortcuts      | Directive usage, automatic lifecycle management |
 | [**Customize Component**](/projects/demo/src/app/customize/customize.component.ts) | Dynamic shortcut recording | Real-time key capture, shortcut customization |
 
 **Run the demo:**
@@ -178,15 +283,15 @@ this.keyboardService.activateGroup('editor');   // Re-enable all editor shortcut
 
 In addition to single-step shortcuts using `keys` / `macKeys`, ngx-keys supports ordered multi-step sequences using `steps` and `macSteps` on the `KeyboardShortcut` object. Each element in `steps` is itself an array of key tokens that must be pressed together for that step.
 
-Example: register a sequence that requires `Ctrl+K` followed by `S`:
+Example: register a sequence that requires `Ctrl+K` followed by `Ctrl+D`:
 
 ```typescript
 this.keyboardService.register({
-  id: 'open-settings-seq',
-  steps: [['ctrl', 'k'], ['s']],
-  macSteps: [['meta', 'k'], ['s']],
-  action: () => this.openSettings(),
-  description: 'Open settings (Ctrl+K then S)'
+  id: 'format-document-seq',
+  steps: [['ctrl', 'k'], ['ctrl', 'd']],
+  macSteps: [['meta', 'k'], ['meta', 'd']],
+  action: () => this.formatDocument(),
+  description: 'Format document (Ctrl+K then Ctrl+D)'
 });
 ```
 
@@ -552,6 +657,108 @@ interface KeyboardShortcutGroup {
   shortcuts: KeyboardShortcut[];  // Array of shortcuts in this group
   active: boolean;                // Whether the group is currently active
 }
+```
+
+### KeyboardShortcutDirective
+
+A declarative directive for registering keyboard shortcuts directly in templates.
+
+#### Selector
+```typescript
+[ngxKeys]
+```
+
+#### Inputs
+
+| Input | Type | Required | Description |
+|-------|------|----------|-------------|
+| `keys` | `string` | No* | Comma-separated keys for single-step shortcut (e.g., `"ctrl,s"`) |
+| `macKeys` | `string` | No | Comma-separated keys for Mac (e.g., `"cmd,s"`) |
+| `steps` | `string[][]` | No* | Multi-step sequence. Each inner array is one step (e.g., `[['ctrl', 'k'], ['ctrl', 'd']]`) |
+| `macSteps` | `string[][]` | No | Multi-step sequence for Mac |
+| `description` | `string` | **Yes** | Human-readable description of what the shortcut does |
+| `action` | `() => void` | No | Custom action to execute. If not provided, triggers click on host element |
+| `shortcutId` | `string` | No | Custom ID for the shortcut. If not provided, generates a unique ID |
+
+\* Either `keys`/`macKeys` OR `steps`/`macSteps` must be provided (not both)
+
+#### Outputs
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `triggered` | `void` | Emitted when the keyboard shortcut is triggered (in addition to the action) |
+
+#### Host Bindings
+
+The directive adds the following to the host element:
+- `data-keyboard-shortcut` attribute with the shortcut ID (useful for styling or testing)
+
+#### Behavior
+
+- **Registration**: Automatically registers the shortcut when the directive initializes
+- **Default Action**: Triggers a click event on the host element (unless custom `action` is provided)
+- **Cleanup**: Automatically unregisters the shortcut when the directive is destroyed
+- **Error Handling**: Throws errors for invalid input combinations or registration failures
+
+#### Usage Examples
+
+**Basic button with click trigger:**
+```html
+<button 
+  ngxKeys
+  keys="ctrl,s"
+  macKeys="cmd,s"
+  description="Save document"
+  (click)="save()">
+  Save
+</button>
+```
+
+**Multi-step shortcut:**
+```html
+<button 
+  ngxKeys
+  [steps]="[['ctrl', 'k'], ['ctrl', 'd']]"
+  [macSteps]="[['cmd', 'k'], ['cmd', 'd']]"
+  description="Format document (Ctrl+K then Ctrl+D)"
+  (click)="format()">
+  Format
+</button>
+```
+
+**Custom action on non-interactive element:**
+```html
+<div 
+  ngxKeys
+  keys="?"
+  description="Show help"
+  [action]="showHelp">
+  Press ? for help
+</div>
+```
+
+**Listen to triggered event:**
+```html
+<button 
+  ngxKeys
+  keys="ctrl,s"
+  description="Save document"
+  (triggered)="onShortcutTriggered()"
+  (click)="save()">
+  Save
+</button>
+```
+
+**Custom shortcut ID:**
+```html
+<button 
+  ngxKeys
+  keys="ctrl,s"
+  description="Save document"
+  shortcutId="my-custom-save-shortcut"
+  (click)="save()">
+  Save
+</button>
 ```
 
 ## Key Mapping Reference

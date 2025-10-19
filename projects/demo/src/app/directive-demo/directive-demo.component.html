@@ -1,0 +1,78 @@
+<h2>Directive Demo</h2>
+<p>Use the <code>ngxKeyboardShortcut</code> directive to configure shortcuts directly in templates.</p>
+
+<p><strong>Recent Action:</strong> {{ lastAction }}</p>
+
+<section class="controls">
+  <button 
+    ngxKeyboardShortcut
+    keys="ctrl,s"
+    macKeys="cmd,s"
+    description="Save document"
+    (click)="onSave()">
+    Save (Saved: {{ saveCount }})
+  </button>
+  
+  <button 
+    ngxKeyboardShortcut
+    keys="delete"
+    description="Delete item"
+    (click)="onDelete()">
+    Delete (Deleted: {{ deleteCount }})
+  </button>
+  
+  <button 
+    ngxKeyboardShortcut
+    keys="?"
+    description="Toggle help"
+    [action]="toggleHelp">
+    Help ({{ helpVisible ? 'visible' : 'hidden' }})
+  </button>
+  
+  <button 
+    ngxKeyboardShortcut
+    [steps]="[['ctrl', 'g'], ['ctrl', 'd']]"
+    description="Format document"
+    (click)="onFormatDocument()">
+    Format
+  </button>
+</section>
+
+<section>
+  <h3>Available Shortcuts:</h3>
+  <ul>
+    <li><kbd>Ctrl+S</kbd> / <kbd>⌘+S</kbd> - Save document</li>
+    <li><kbd>Delete</kbd> - Delete item</li>
+    <li><kbd>?</kbd> - Toggle help panel</li>
+    <li><kbd>Ctrl+G</kbd> then <kbd>Ctrl+D</kbd> - Format document (multi-step)</li>
+  </ul>
+</section>
+
+@if (helpVisible) {
+  <section>
+    <fieldset>
+      <legend>Help Panel</legend>
+      <p>The <code>ngxKeyboardShortcut</code> directive automatically:</p>
+      <ul>
+        <li>Registers shortcuts when initialized</li>
+        <li>Triggers click events or custom actions</li>
+        <li>Unregisters shortcuts when destroyed</li>
+      </ul>
+    </fieldset>
+  </section>
+}
+
+<section>
+  <fieldset>
+    <legend>Recent Actions ({{ notifications.length }})</legend>
+    @if (notifications.length === 0) {
+      <p><em>No actions yet. Try pressing some shortcuts!</em></p>
+    } @else {
+      <ol>
+        @for (notification of notifications; track $index) {
+          <li>{{ notification }}</li>
+        }
+      </ol>
+    }
+  </fieldset>
+</section>
