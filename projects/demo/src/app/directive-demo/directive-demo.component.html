@@ -1,11 +1,11 @@
 <h2>Directive Demo</h2>
-<p>Use the <code>ngxKeyboardShortcut</code> directive to configure shortcuts directly in templates.</p>
+<p>Use the <code>ngxKeys</code> directive to configure shortcuts directly in templates.</p>
 
 <p><strong>Recent Action:</strong> {{ lastAction }}</p>
 
 <section class="controls">
   <button 
-    ngxKeyboardShortcut
+    ngxKeys
     keys="ctrl,s"
     macKeys="cmd,s"
     description="Save document"
@@ -14,7 +14,7 @@
   </button>
   
   <button 
-    ngxKeyboardShortcut
+    ngxKeys
     keys="delete"
     description="Delete item"
     (click)="onDelete()">
@@ -22,7 +22,7 @@
   </button>
   
   <button 
-    ngxKeyboardShortcut
+    ngxKeys
     keys="?"
     description="Toggle help"
     [action]="toggleHelp">
@@ -30,7 +30,7 @@
   </button>
   
   <button 
-    ngxKeyboardShortcut
+    ngxKeys
     [steps]="[['ctrl', 'g'], ['ctrl', 'd']]"
     description="Format document"
     (click)="onFormatDocument()">
@@ -52,7 +52,7 @@
   <section>
     <fieldset>
       <legend>Help Panel</legend>
-      <p>The <code>ngxKeyboardShortcut</code> directive automatically:</p>
+      <p>The <code>ngxKeys</code> directive automatically:</p>
       <ul>
         <li>Registers shortcuts when initialized</li>
         <li>Triggers click events or custom actions</li>

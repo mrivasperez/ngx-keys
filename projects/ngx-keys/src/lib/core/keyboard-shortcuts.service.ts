@@ -240,6 +240,34 @@ export class KeyboardShortcuts implements OnDestroy {
       if (newShortcut.macSteps && existing.macSteps && this.stepsMatch(newShortcut.macSteps, existing.macSteps)) {
         return existing.id;
       }
+
+      // Check if new single-step shortcut conflicts with first step of existing multi-step shortcut
+      if (newShortcut.keys && existing.steps) {
+        const firstStep = existing.steps[FIRST_INDEX];
+        if (firstStep && this.keysMatch(newShortcut.keys, firstStep)) {
+          return existing.id;
+        }
+      }
+      if (newShortcut.macKeys && existing.macSteps) {
+        const firstStep = existing.macSteps[FIRST_INDEX];
+        if (firstStep && this.keysMatch(newShortcut.macKeys, firstStep)) {
+          return existing.id;
+        }
+      }
+
+      // Check if new multi-step shortcut's first step conflicts with existing single-step shortcut
+      if (newShortcut.steps && existing.keys) {
+        const firstStep = newShortcut.steps[FIRST_INDEX];
+        if (firstStep && this.keysMatch(firstStep, existing.keys)) {
+          return existing.id;
+        }
+      }
+      if (newShortcut.macSteps && existing.macKeys) {
+        const firstStep = newShortcut.macSteps[FIRST_INDEX];
+        if (firstStep && this.keysMatch(firstStep, existing.macKeys)) {
+          return existing.id;
+        }
+      }
     }
     return null;
   }
@@ -252,7 +280,7 @@ export class KeyboardShortcuts implements OnDestroy {
     const shortcut = this.shortcuts.get(shortcutId);
     if (!shortcut) return [];
 
-    const conflicts: string[] = [];
+    const conflictsSet = new Set<string>();
     for (const existing of this.shortcuts.values()) {
       // Skip self and inactive shortcuts
       if (existing.id === shortcutId || !this.activeShortcuts.has(existing.id)) {
@@ -264,10 +292,43 @@ export class KeyboardShortcuts implements OnDestroy {
           (shortcut.macKeys && existing.macKeys && this.keysMatch(shortcut.macKeys, existing.macKeys)) ||
           (shortcut.steps && existing.steps && this.stepsMatch(shortcut.steps, existing.steps)) ||
           (shortcut.macSteps && existing.macSteps && this.stepsMatch(shortcut.macSteps, existing.macSteps))) {
-        conflicts.push(existing.id);
+        conflictsSet.add(existing.id);
+        continue; // Skip further checks for this shortcut to avoid duplicate adds
+      }
+
+      // Check if shortcut's single-step conflicts with first step of existing multi-step shortcut
+      if (shortcut.keys && existing.steps) {
+        const firstStep = existing.steps[FIRST_INDEX];
+        if (firstStep && this.keysMatch(shortcut.keys, firstStep)) {
+          conflictsSet.add(existing.id);
+          continue;
+        }
+      }
+      if (shortcut.macKeys && existing.macSteps) {
+        const firstStep = existing.macSteps[FIRST_INDEX];
+        if (firstStep && this.keysMatch(shortcut.macKeys, firstStep)) {
+          conflictsSet.add(existing.id);
+          continue;
+        }
+      }
+
+      // Check if shortcut's multi-step first step conflicts with existing single-step shortcut
+      if (shortcut.steps && existing.keys) {
+        const firstStep = shortcut.steps[FIRST_INDEX];
+        if (firstStep && this.keysMatch(firstStep, existing.keys)) {
+          conflictsSet.add(existing.id);
+          continue;
+        }
+      }
+      if (shortcut.macSteps && existing.macKeys) {
+        const firstStep = shortcut.macSteps[FIRST_INDEX];
+        if (firstStep && this.keysMatch(firstStep, existing.macKeys)) {
+          conflictsSet.add(existing.id);
+          continue;
+        }
       }
     }
-    return conflicts;
+    return Array.from(conflictsSet);
   }
 
   /**

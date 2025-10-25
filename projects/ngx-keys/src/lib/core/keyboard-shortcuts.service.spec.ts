@@ -1014,6 +1014,52 @@ describe('KeyboardShortcuts', () => {
         );
       });
 
+      it('should throw error when registering single-step shortcut that conflicts with first step of multi-step shortcut', () => {
+        // Register a multi-step shortcut first (Ctrl+K, then S)
+        const multiStepShortcut = createMockShortcut({
+          id: 'multi-step-save',
+          steps: [['ctrl', 'k'], ['s']],
+          action: () => {},
+          description: 'Multi-step save',
+        });
+        service.register(multiStepShortcut);
+
+        // Try to register a single-step shortcut with the same keys as the first step
+        const conflictingShortcut = createMockShortcut({
+          id: 'single-step-conflict',
+          keys: ['ctrl', 'k'],
+          action: () => {},
+          description: 'Conflicting shortcut',
+        });
+
+        expect(() => service.register(conflictingShortcut)).toThrowError(
+          KeyboardShortcutsErrors.ACTIVE_KEY_CONFLICT('multi-step-save')
+        );
+      });
+
+      it('should throw error when registering multi-step shortcut whose first step conflicts with single-step shortcut', () => {
+        // Register a single-step shortcut first
+        const singleStepShortcut = createMockShortcut({
+          id: 'single-step-action',
+          keys: ['ctrl', 'k'],
+          action: () => {},
+          description: 'Single step action',
+        });
+        service.register(singleStepShortcut);
+
+        // Try to register a multi-step shortcut whose first step conflicts
+        const conflictingMultiStep = createMockShortcut({
+          id: 'multi-step-conflict',
+          steps: [['ctrl', 'k'], ['s']],
+          action: () => {},
+          description: 'Multi-step conflict',
+        });
+
+        expect(() => service.register(conflictingMultiStep)).toThrowError(
+          KeyboardShortcutsErrors.ACTIVE_KEY_CONFLICT('single-step-action')
+        );
+      });
+
       it('should allow registering shortcuts with same keys when original is inactive', () => {
         service.register({ ...mockShortcut, id: 'shortcut-1' });
         service.deactivate('shortcut-1'); // Make it inactive
