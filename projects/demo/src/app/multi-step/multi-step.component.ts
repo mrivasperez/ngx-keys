@@ -1,11 +1,11 @@
 import { Component, ChangeDetectionStrategy, computed, inject, DestroyRef, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { KeyboardShortcuts, KeyboardShortcut } from 'ngx-keys';
 
 @Component({
     standalone: true,
     selector: 'demo-multi-step',
-    imports: [CommonModule],
+    imports: [],
     templateUrl: './multi-step.component.html',
     styleUrls: ['./multi-step.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush
