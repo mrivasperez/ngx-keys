@@ -11,6 +11,7 @@ import { KeyboardShortcutsErrors } from '../errors/keyboard-shortcuts.errors';
   selector: 'test-host',
   standalone: true,
   imports: [KeyboardShortcutDirective],
+  changeDetection: ngCore.ChangeDetectionStrategy.Eager,
   template: `
     <button
       #testButton

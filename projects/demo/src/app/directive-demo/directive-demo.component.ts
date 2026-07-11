@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { KeyboardShortcutDirective } from '../../../../ngx-keys/src/public-api';
 
 @Component({
@@ -6,6 +6,7 @@ import { KeyboardShortcutDirective } from '../../../../ngx-keys/src/public-api';
   standalone: true,
   imports: [KeyboardShortcutDirective],
   templateUrl: './directive-demo.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './directive-demo.component.css',
 })
 export class DirectiveDemoComponent {
